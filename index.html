@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="ro" class="standalone-host">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="description" content="Caiet: aplicația care îți explică lecțiile pe înțelesul tău, cu ajutorul AI. Prototip interactiv.">
+<meta name="theme-color" content="#EDF0F8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Caiet">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Caiet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&family=Caveat:wght@500;600&display=swap">
+<style>
+/* Layout: one iPhone-sized app (390×844). On a phone it fills the screen; on a laptop it sits inside a drawn iPhone on notebook-grid paper. */
+:root{
+  color-scheme: light;
+  --ink:#14161F; --muted:#4a5068; --soft:#6a7186; --pix:#2447D6; --pix2:#5C78FF;
+  --coral:#FF6B4A; --coral-d:#D84A2A; --butter:#FFD66E; --gold:#F2B530; --mint:#2FBF94; --mint-d:#1d8a68;
+  --paper:#FFFFFF; --grid:rgba(36,71,214,.07); --line:rgba(20,22,31,.08);
+  --f-ui:"Inter", -apple-system, "SF Pro Text", "Segoe UI", Roboto, Arial, sans-serif;
+  --f-hand:"Caveat", "Segoe Print", "Bradley Hand", cursive;
+  --sat:0px; --sab:0px; --top:58px; --bot:30px;
+  --ease:cubic-bezier(.32,.72,0,1);
+}
+html.standalone-host{ --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px) }
+html{height:100%;box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box}
+body{height:100%;margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-ui);-webkit-font-smoothing:antialiased;overflow:hidden;
+  -webkit-tap-highlight-color:transparent;font-feature-settings:"cv11","ss01"}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input{font:inherit;color:inherit}
+:focus-visible{outline:2.5px solid var(--pix);outline-offset:2px}
+svg{display:block}
+
+/* ---------- stage (desktop: drawn phone on grid paper) ---------- */
+#stage{position:relative;height:100%;width:100%;display:flex;align-items:center;justify-content:center;gap:56px;padding-inline:16px;
+  background:
+    radial-gradient(40% 50% at 70% 25%, rgba(92,120,255,.18), transparent 70%),
+    radial-gradient(35% 45% at 85% 75%, rgba(255,138,107,.16), transparent 70%),
+    radial-gradient(40% 40% at 50% 100%, rgba(255,214,110,.20), transparent 70%),
+    linear-gradient(var(--grid) 1px, transparent 1px) 0 0/22px 22px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/22px 22px, var(--paper)}
+#side{display:none;max-width:340px;flex-direction:column;gap:18px}
+.framed #side.show{display:flex}
+#side .word{font-size:64px;font-weight:800;letter-spacing:-3px;line-height:1}
+#side .word b{color:var(--gold)}
+#side p{margin:0;font-size:16px;line-height:1.5;color:var(--muted);text-wrap:pretty}
+#side .lbl2{font-size:12px;font-weight:700;letter-spacing:2px;color:var(--pix);text-transform:uppercase}
+#side .row{display:flex;gap:10px;flex-wrap:wrap}
+.sbtn{height:44px;padding:0 18px;border-radius:999px;font-weight:600;font-size:15px;background:var(--ink);color:#fff}
+.sbtn.ghost{background:rgba(255,255,255,.7);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+#side .hand{font-family:var(--f-hand);font-size:30px;color:var(--pix);transform:rotate(-2deg);line-height:1.05}
+
+#device{position:relative;flex:none}
+.framed #device{width:412px;height:866px;border-radius:64px;padding:4px;transform:scale(var(--scale,1));transform-origin:center;
+  background:linear-gradient(150deg,#f4f5f7 0%,#b9bdc5 16%,#eef0f3 34%,#9ca0a9 58%,#e6e8eb 78%,#aeb2b9 100%);
+  box-shadow:0 60px 70px -30px rgba(16,22,52,.45),0 28px 40px -18px rgba(16,22,52,.30),0 2px 3px rgba(0,0,0,.25),inset 0 0 0 1px rgba(255,255,255,.65)}
+.framed #bezel{width:100%;height:100%;border-radius:60px;background:#07080a;padding:7px}
+.framed #app{width:390px;height:844px;border-radius:53px}
+#app{position:relative;overflow:hidden;isolation:isolate;background:#EDF0F8}
+.phone-ui #stage{padding:0;display:block;background:#EDF0F8}
+.phone-ui #device,.phone-ui #bezel,.phone-ui #app{width:100%;height:100%}
+.phone-ui{--top:calc(var(--sat) + 12px);--bot:calc(var(--sab) + 16px)}
+.dbtn{display:none}
+.framed .dbtn{display:block;position:absolute;width:4px;border-radius:2px;background:linear-gradient(90deg,#8e929a,#d7d9dd)}
+
+/* fake system chrome, only inside the drawn phone */
+#sbar,#island,#homeind{display:none}
+.framed #sbar{display:flex;position:absolute;top:0;left:0;right:0;height:54px;align-items:center;justify-content:space-between;padding:6px 30px 0 46px;z-index:60;font-weight:600;font-size:17px;pointer-events:none;transition:color .3s}
+.framed #island{display:block;position:absolute;top:11px;left:50%;transform:translateX(-50%);width:124px;height:36px;border-radius:20px;background:#000;z-index:61;pointer-events:none}
+.framed #homeind{display:block;position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:138px;height:5px;border-radius:3px;background:rgba(10,10,14,.85);z-index:61;pointer-events:none;transition:background .3s}
+#app.dark #sbar{color:#fff} #app.dark #homeind{background:rgba(255,255,255,.9)}
+#sbar .ic{display:flex;gap:6px;align-items:center}
+
+/* ---------- pages ---------- */
+.page{position:absolute;inset:0;overflow:hidden;background:#EDF0F8;will-change:transform}
+.wall{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.wall .b{position:absolute;border-radius:50%;filter:blur(46px)}
+.wall .grid{position:absolute;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:22px 22px}
+.pg{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;padding-top:var(--top)}
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 18px 22px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.scroll::-webkit-scrollbar{display:none}
+.foot{flex:none;padding:10px 18px var(--bot);display:flex;flex-direction:column;gap:10px}
+.stack{display:flex;flex-direction:column}
+
+.anim-in-r{animation:inR .46s var(--ease) both}.anim-out-l{animation:outL .46s var(--ease) both}
+.anim-in-l{animation:inL .46s var(--ease) both}.anim-out-r{animation:outR .46s var(--ease) both}
+.anim-in-up{animation:inUp .5s var(--ease) both}.anim-out-down{animation:outDown .42s var(--ease) both}
+.anim-fade-in{animation:fadeIn .28s ease both}.anim-fade-out{animation:fadeOut .28s ease both}
+@keyframes inR{from{transform:translateX(100%)}to{transform:none}}
+@keyframes outL{from{transform:none;filter:none}to{transform:translateX(-28%);filter:brightness(.85)}}
+@keyframes inL{from{transform:translateX(-28%);filter:brightness(.85)}to{transform:none;filter:none}}
+@keyframes outR{from{transform:none}to{transform:translateX(100%)}}
+@keyframes inUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes outDown{from{transform:none}to{transform:translateY(100%)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}} @keyframes fadeOut{from{opacity:1}to{opacity:0}}
+.out-r,.out-down{z-index:5}
+
+/* ---------- liquid glass ---------- */
+.glass{position:relative;border-radius:26px;background:rgba(255,255,255,.30);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+  box-shadow:inset 0 1.5px 1px rgba(255,255,255,.9),inset 0 -1px 1px rgba(255,255,255,.35),inset 0 0 18px rgba(255,255,255,.18),0 10px 28px -8px rgba(28,38,90,.22),0 1px 2px rgba(28,38,90,.08)}
+.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.2px;pointer-events:none;
+  background:linear-gradient(140deg,rgba(255,255,255,.95),rgba(255,255,255,.15) 38%,rgba(255,255,255,.05) 62%,rgba(255,255,255,.7));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.glass::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(165deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,0) 32%)}
+.frost{background:rgba(255,255,255,.58)}
+.dk{background:rgba(255,255,255,.13);box-shadow:inset 0 1px 1px rgba(255,255,255,.45),inset 0 -1px 1px rgba(255,255,255,.12),0 12px 30px -10px rgba(0,0,0,.5)}
+.dk::before{background:linear-gradient(140deg,rgba(255,255,255,.6),rgba(255,255,255,.08) 40%,rgba(255,255,255,.03) 62%,rgba(255,255,255,.35))}
+.dk::after{background:linear-gradient(165deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 30%)}
+.glass>*{position:relative;z-index:1}
+
+.tap{transition:transform .18s var(--ease),opacity .18s}
+.tap:active{transform:scale(.965)}
+.row{display:flex;align-items:center}.between{justify-content:space-between}
+.lbl{font-size:12px;font-weight:650;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+.h1{font-size:34px;font-weight:700;letter-spacing:-.9px;line-height:1.05;margin:0;text-wrap:balance}
+.h1.s30{font-size:30px}
+.sub{font-size:15.5px;color:#3a3f4f;line-height:1.38;margin:6px 0 0}
+.circle{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:650;letter-spacing:.4px;white-space:nowrap}
+.cta{height:54px;border-radius:999px;background:var(--ink);color:#fff;font-weight:600;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 18px -6px rgba(20,22,31,.55)}
+.cta.ink{background:linear-gradient(180deg,#3358F0,#2040C8)}
+.cta[disabled]{background:rgba(20,22,31,.18);box-shadow:none;color:rgba(255,255,255,.95);cursor:default}
+.gbtn{height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:9px;font-weight:600;font-size:16px;width:100%}
+.card{padding:16px;border-radius:26px}
+.muted{color:var(--muted)}
+
+/* top bar with steps */
+.topbar{display:flex;align-items:center;gap:12px;padding:0 20px 0 16px;margin-bottom:14px}
+.segs{flex:1;display:flex;gap:5px}.segs i{flex:1;height:6px;border-radius:3px;background:rgba(20,22,31,.12);transition:background .4s}
+.segs i.on{background:var(--pix)}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 16px;margin-bottom:12px;gap:10px}
+
+/* chips & rows */
+.chips3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chip{height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:650}
+.chip.on{background:var(--pix)!important;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 16px -8px rgba(36,71,214,.7)!important}
+.chip.on::before,.chip.on::after{display:none}
+.prow{height:50px;border-radius:16px;padding:0 14px 0 16px;display:flex;align-items:center;justify-content:space-between;width:100%;font-size:15.5px;font-weight:550;text-align:left}
+.prow.on{background:rgba(255,255,255,.8);box-shadow:inset 0 0 0 1.8px var(--pix),inset 0 1px 1px #fff;font-weight:650}
+.radio{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1.8px rgba(20,22,31,.25);flex:none}
+.field{height:50px;border-radius:16px;padding:0 14px;display:flex;align-items:center;gap:10px}
+.field input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:16px}
+.field input::placeholder{color:#8a90a2}
+.sw{width:52px;height:30px;border-radius:15px;background:rgba(20,22,31,.12);position:relative;flex:none;transition:background .25s}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.22);transition:transform .3s var(--ease)}
+.sw.on{background:var(--pix)}.sw.on::after{transform:translateX(22px)}
+.srow{height:52px;padding:0 12px 0 10px;display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left}
+.sic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex:none}
+.sep{height:1px;background:rgba(20,22,31,.07);margin-left:54px}
+
+/* options (quiz) */
+.opt{min-height:52px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-size:16.5px;font-weight:600;width:100%;text-align:left;gap:10px}
+.opt.dash{border:1.8px dashed rgba(20,22,31,.3);background:transparent;box-shadow:none;color:#3a3f4f}
+.opt.dash::before,.opt.dash::after{display:none}
+.opt.pick{background:rgba(36,71,214,.14);box-shadow:inset 0 0 0 1.8px var(--pix)}
+.opt.good{background:rgba(47,191,148,.20);box-shadow:inset 0 0 0 1.5px rgba(47,191,148,.9),inset 0 1px 1px rgba(255,255,255,.8)}
+.opt.bad{background:rgba(255,107,74,.16);box-shadow:inset 0 0 0 1.5px rgba(255,107,74,.85)}
+.opt[disabled]{cursor:default}
+
+/* tab bar */
+.tabbar{position:absolute;left:16px;right:88px;bottom:calc(var(--bot) - 4px);height:64px;border-radius:34px;display:flex;align-items:center;justify-content:space-around;padding:0 6px;z-index:30}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:#3a3f4f;width:86px;height:54px;justify-content:center;border-radius:28px}
+.tab.on{color:var(--pix);background:rgba(255,255,255,.62);box-shadow:inset 0 1px 1px #fff,0 2px 8px rgba(30,40,90,.10)}
+.fab{position:absolute;right:16px;bottom:calc(var(--bot) - 4px);width:64px;height:64px;border-radius:50%;z-index:30;display:flex;align-items:center;justify-content:center}
+
+/* chat */
+.msgs{display:flex;flex-direction:column;gap:8px;padding-top:4px}
+.bub{max-width:82%;padding:11px 15px;border-radius:22px;font-size:15.5px;line-height:1.38;animation:pop .32s var(--ease) both}
+.bub.ai{border-bottom-left-radius:8px;align-self:flex-start}
+.bub.me{align-self:flex-end;background:linear-gradient(180deg,#3A5EF5,#2346D2);color:#fff;border-bottom-right-radius:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 16px -8px rgba(36,71,214,.6)}
+.formula{margin-top:9px;padding:9px 12px;border-radius:14px;background:rgba(36,71,214,.08);font-weight:650;text-align:center;font-size:16px}
+.ok-line{display:flex;gap:7px;align-items:center;font-weight:650;color:var(--mint-d)}
+.typing{display:flex;gap:4px;padding:14px 16px}.typing i{width:7px;height:7px;border-radius:50%;background:#7a8095;animation:dot 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.qchips{display:flex;gap:8px;flex-wrap:wrap}
+.qchip{padding:9px 13px;border-radius:999px;font-size:13.5px;font-weight:600}
+.composer{display:flex;gap:8px;align-items:center}
+.composer .field{flex:1;height:52px;border-radius:999px;padding:0 8px 0 18px}
+.send{width:52px;height:52px;border-radius:50%;background:linear-gradient(180deg,#3A5EF5,#2346D2);display:flex;align-items:center;justify-content:center;flex:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 8px 16px -6px rgba(36,71,214,.6)}
+
+/* toast & sheet */
+#toast{position:absolute;left:50%;top:calc(var(--top) + 4px);transform:translate(-50%,-140%);z-index:90;padding:11px 18px;border-radius:999px;font-size:14px;font-weight:600;
+  white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis;opacity:0;visibility:hidden;transition:transform .45s var(--ease),opacity .3s,visibility 0s .45s}
+#toast.show{transform:translate(-50%,0);opacity:1;visibility:visible;transition:transform .45s var(--ease),opacity .2s}
+.sheet-back{position:absolute;inset:0;z-index:80;background:rgba(10,12,24,.28);animation:fadeIn .25s both}
+.sheet{position:absolute;left:8px;right:8px;bottom:8px;z-index:81;border-radius:38px;padding:12px 20px calc(var(--bot) - 4px);animation:inUp .45s var(--ease) both;max-height:86%;overflow-y:auto}
+.sheet.frost{background:rgba(255,255,255,.82)}
+.grab{width:38px;height:5px;border-radius:3px;background:rgba(20,22,31,.18);margin:0 auto 14px}
+.closing .sheet{animation:outDown .32s var(--ease) both}.closing.sheet-back{animation:fadeOut .3s both}
+
+/* scan */
+.cam{position:absolute;inset:0;background:#3a312b;overflow:hidden}
+.desk{position:absolute;inset:0;background:repeating-linear-gradient(95deg,rgba(255,255,255,.03) 0 3px,rgba(0,0,0,.04) 3px 9px),linear-gradient(180deg,#5a4a3e,#2c241f)}
+.paper{position:absolute;left:-8%;top:5%;width:118%;height:86%;transform:rotate(-4deg);background:#fbfbf8;box-shadow:0 30px 50px rgba(0,0,0,.45);
+  background-image:linear-gradient(rgba(70,110,200,.22) 1px,transparent 1px),linear-gradient(90deg,rgba(70,110,200,.22) 1px,transparent 1px);background-size:21px 21px;background-position:9px 6px}
+.paper .hw{position:absolute;font-family:var(--f-hand);color:#1f3fc2;line-height:1;white-space:nowrap}
+.vign{position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 35%,rgba(255,240,220,.10),rgba(0,0,0,.45))}
+#camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+.scanbox{position:absolute;left:13%;top:24.5%;width:72%;height:9.5%;border-radius:18px;transition:box-shadow .5s,background .5s}
+.collage{position:relative;height:300px;flex:none}
+@media (max-height:740px){.phone-ui .collage{transform:scale(.78);transform-origin:top center;margin-bottom:-66px}}
+.scanbox.found{background:rgba(255,255,255,.08);box-shadow:0 0 0 2000px rgba(0,0,0,.18),0 0 30px rgba(120,160,255,.45)}
+.scanline{position:absolute;left:4%;right:4%;height:3px;border-radius:2px;background:linear-gradient(90deg,transparent,#9db4ff,transparent);box-shadow:0 0 18px #7fa0ff;opacity:0}
+.scanning .scanline{animation:scan 1.1s ease-in-out 2;opacity:1}
+@keyframes scan{0%{top:5%}50%{top:90%}100%{top:5%}}
+.shutter{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.shutter i{width:62px;height:62px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:70}
+.flash.go{animation:flash .5s ease}
+@keyframes flash{0%{opacity:0}15%{opacity:.85}100%{opacity:0}}
+
+.bars{display:flex;align-items:flex-end;justify-content:space-between;height:104px;margin-top:14px;padding:0 4px}
+.bars div{text-align:center;display:flex;flex-direction:column;align-items:center}
+.bars span{display:block;width:28px;border-radius:9px;background:rgba(36,71,214,.22);transition:height .8s var(--ease)}
+.bars small{font-size:11.5px;font-weight:600;color:var(--muted);margin-top:6px}
+.mrow{padding:10px 2px}.mtrack{height:7px;border-radius:4px;background:rgba(20,22,31,.07);margin-top:7px;overflow:hidden}
+.mtrack i{display:block;height:100%;border-radius:4px;width:0;transition:width .9s var(--ease)}
+.dot9{width:9px;height:9px;border-radius:50%;display:inline-block}
+.float1{animation:bob 6s ease-in-out infinite}.float2{animation:bob 7s ease-in-out -2s infinite}.float3{animation:bob 6.5s ease-in-out -4s infinite}
+@keyframes bob{0%,100%{translate:0 0}50%{translate:0 -6px}}
+.spin{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <aside id="side" aria-label="Despre prototip">
+    <div class="lbl2">Prototip interactiv</div>
+    <div class="word">caiet<b>.</b></div>
+    <p>Aplicația care îți explică lecțiile pe înțelesul tău, cu ajutorul AI. Atinge ecranul ca pe un telefon: îți faci cont, dai testul de pornire și rezolvi un exercițiu cu indicii.</p>
+    <div class="row">
+      <button class="sbtn tap" data-act="reset">Reia de la început</button>
+      <button class="sbtn ghost tap" data-act="jumpHome">Sari la ecranul principal</button>
+    </div>
+    <div class="hand">merge și pe telefon,<br>deschide linkul acolo :)</div>
+  </aside>
+  <div id="device">
+    <div class="dbtn" style="left:-3px;top:150px;height:30px"></div><div class="dbtn" style="left:-3px;top:206px;height:58px"></div>
+    <div class="dbtn" style="left:-3px;top:276px;height:58px"></div><div class="dbtn" style="right:-3px;top:226px;height:92px"></div>
+    <div id="bezel">
+      <div id="app" role="application" aria-label="Aplicația Caiet">
+        <div id="sbar"><span id="clock">21:47</span><span class="ic">
+          <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 11.6l2.4-2.9a3.6 3.6 0 0 0-4.8 0z"/><path d="M8 4.6c1.9 0 3.6.7 4.9 1.9l1.5-1.8A9.6 9.6 0 0 0 8 2.3 9.6 9.6 0 0 0 1.6 4.7l1.5 1.8A7.2 7.2 0 0 1 8 4.6z"/><path d="M8 0C5 0 2.2 1.1 0 3l1.1 1.3A10.4 10.4 0 0 1 8 1.7c2.6 0 5 .9 6.9 2.6L16 3A12 12 0 0 0 8 0z"/></svg>
+          <svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="16" height="9" rx="2" fill="currentColor"/><rect x="24.5" y="4.5" width="1.6" height="4" rx=".8" fill="currentColor" opacity=".45"/></svg>
+        </span></div>
+        <div id="island"></div>
+        <div id="pages"></div>
+        <div id="toast" class="glass frost" role="status" aria-live="polite"></div>
+        <div id="homeind"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+/* ================= helpers ================= */
+const $ = (s, r = document) => r.querySelector(s);
+const ZILE = ["duminică","luni","marți","miercuri","joi","vineri","sâmbătă"];
+const LUNI = ["ianuarie","februarie","martie","aprilie","mai","iunie","iulie","august","septembrie","octombrie","noiembrie","decembrie"];
+const addDays = (n) => { const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() + n); return d; };
+const fmtDay = (d) => `${ZILE[d.getDay()]}, ${d.getDate()} ${LUNI[d.getMonth()]}`;
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const inDays = (n) => n === 0 ? "azi" : n === 1 ? "mâine" : `în ${n} zile`;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const buzz = () => { try { navigator.vibrate && navigator.vibrate(8); } catch (e) {} };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const I = {
+  chev:'<svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L2 10l8 8"/></svg>',
+  x:'<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 3l10 10M13 3L3 13"/></svg>',
+  arrow:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>',
+  up:'<svg width="18" height="20" viewBox="0 0 18 20" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V3M2.5 9L9 2.5 15.5 9"/></svg>',
+  cam:'<svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 9a2.5 2.5 0 0 1 2.5-2.5h2.8L10 4h6l1.7 2.5h2.8A2.5 2.5 0 0 1 23 9v10a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 3 19z"/><circle cx="13" cy="13.5" r="4.2"/></svg>',
+  sun:(c)=>`<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="4.2" ${c==="#2447D6"?'fill="#2447D6"':''}/><path d="M11 1.5v2.2M11 18.3v2.2M1.5 11h2.2M18.3 11h2.2M4.3 4.3l1.5 1.5M16.2 16.2l1.5 1.5M4.3 17.7l1.5-1.5M16.2 5.8l1.5-1.5"/></svg>`,
+  cards:(c)=>`<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="${c}" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="6.5" width="12.5" height="13" rx="2.5"/><path d="M7 3h9.5a2.5 2.5 0 0 1 2.5 2.5V15"/></svg>`,
+  user:(c,f)=>`<svg width="22" height="22" viewBox="0 0 22 22" fill="${f?c:"none"}" stroke="${c}" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="7.5" r="4"/><path d="M3.5 20c.8-4 3.8-6 7.5-6s6.7 2 7.5 6${f?"z":""}"/></svg>`,
+  flame:'<svg width="16" height="18" viewBox="0 0 16 18" fill="#FF6B4A"><path d="M8.6 0C9 3.2 13.8 5.3 14.3 10A6.3 6.3 0 0 1 8 17.6 6.2 6.2 0 0 1 1.7 11.4c0-2.4 1.2-4 2.6-5.3.1 1.6.9 2.9 2.1 3.3C6 6.6 6.5 2.8 8.6 0z"/></svg>',
+  check:(c="#2447D6",s=22)=>`<svg width="${s}" height="${s}" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="${c}"/><path d="M6.4 11.3l3 3 6.2-6.3" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  cross:(s=22)=>`<svg width="${s}" height="${s}" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#FF6B4A"/><path d="M7.5 7.5l7 7M14.5 7.5l-7 7" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>`,
+  mail:(c="#14161F")=>`<svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"><rect x="1" y="1" width="18" height="14" rx="3"/><path d="M2 3l8 6 8-6"/></svg>`,
+  shield:'<svg width="16" height="18" viewBox="0 0 16 18" fill="none" stroke="#2447D6" stroke-width="1.8" stroke-linejoin="round"><path d="M8 1l6.5 2.5V8c0 4.2-2.8 7.4-6.5 9-3.7-1.6-6.5-4.8-6.5-9V3.5z"/><path d="M5 9l2.2 2.2L11 7.4" stroke-linecap="round"/></svg>',
+  search:'<svg width="17" height="17" viewBox="0 0 17 17" fill="none" stroke="#6a7186" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><path d="M11.2 11.2L16 16"/></svg>',
+  bolt:(c)=>`<svg width="14" height="20" viewBox="0 0 14 20" fill="${c}"><path d="M8.5 0L0 11.5h6L4.8 20 14 7.8H8z"/></svg>`,
+  mic:'<svg width="14" height="20" viewBox="0 0 14 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3.5" y="1" width="7" height="11" rx="3.5"/><path d="M1 9.5a6 6 0 0 0 12 0M7 15.5V19"/></svg>',
+  bell:'<svg width="18" height="20" viewBox="0 0 18 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 2a5.5 5.5 0 0 0-5.5 5.5c0 4.5-2 6-2 6h15s-2-1.5-2-6A5.5 5.5 0 0 0 9 2z"/><path d="M7 17a2 2 0 0 0 4 0" stroke-linecap="round"/></svg>',
+  redo:'<svg width="18" height="18" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a7 7 0 1 0 2.1-5"/><path d="M4 3.5V8h4.5"/></svg>',
+};
+const LOGO = (s=92) => `<div style="width:${s}px;height:${s}px;border-radius:${s*.24}px;background:linear-gradient(160deg,#5873FF 0%,#2447D6 55%,#1C36AE 100%);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 16px 30px -12px rgba(20,40,140,.55),inset 0 2px 1px rgba(255,255,255,.45);flex:none">
+  <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.10) 1px,transparent 1px);background-size:${Math.round(s/7.5)}px ${Math.round(s/7.5)}px"></div>
+  <div style="position:absolute;inset:0;background:linear-gradient(170deg,rgba(255,255,255,.35) 0%,rgba(255,255,255,0) 40%)"></div>
+  <div style="position:relative;font-weight:800;font-size:${s*.63}px;letter-spacing:-${s*.033}px;color:#fff;line-height:1;margin-top:-${s*.08}px">c<span style="color:#FFD66E">.</span></div></div>`;
+
+/* ================= state ================= */
+const KEY = "caiet-demo-v1";
+const DEFAULT = () => ({
+  onboarded:false, name:"Ioana", email:"", grade:null, profile:null, school:"", classCode:"",
+  subjects:{mate:true, fizica:true, info:true, romana:true, chimie:false, bio:false, engleza:false},
+  diag:null, minutes:20, remind:"19:30", remindOn:true, parent:false, active:"mate",
+  extraTeze:[], cardsDue:12, cardsKnown:41, lessonDone:0, streak:7,
+});
+let S = DEFAULT();
+try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(DEFAULT(), JSON.parse(raw)); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+const SUBJ = [
+  {k:"mate", n:"Matematică", c:"#2447D6", g:"∑"}, {k:"fizica", n:"Fizică", c:"#7C5CFF", g:"F"},
+  {k:"info", n:"Informatică", c:"#14161F", g:"&lt;/&gt;"}, {k:"romana", n:"Limba română", c:"#D84A2A", g:"Ro"},
+  {k:"chimie", n:"Chimie", c:"#2FBF94", g:"Ch"}, {k:"bio", n:"Biologie", c:"#5aa83a", g:"Bi"}, {k:"engleza", n:"Engleză", c:"#E0A21C", g:"En"},
+];
+const HERO = {
+  mate:{topic:"Funcții de gradul al II-lea", days:2, left:"3 lecții rămase · cam 40 de minute"},
+  romana:{topic:"Figurile de stil", days:15, left:"5 lecții rămase · cam 1 oră"},
+  fizica:{topic:"Mișcarea rectilinie uniformă", days:9, left:"4 lecții rămase · cam 50 de minute"},
+  info:{topic:"Algoritmi elementari", days:12, left:"4 lecții rămase · cam 45 de minute"},
+  chimie:{topic:"Structura atomului", days:10, left:"3 lecții rămase · cam 35 de minute"},
+  bio:{topic:"Celula", days:11, left:"3 lecții rămase · cam 35 de minute"},
+  engleza:{topic:"Present Perfect", days:8, left:"2 lecții rămase · cam 25 de minute"},
+};
+const PROFILES = ["Matematică-informatică","Științe ale naturii","Filologie","Științe sociale","Tehnologic"];
+const GRADES = ["a VIII-a","a IX-a","a X-a","a XI-a","a XII-a"];
+const program = () => {
+  if (S.grade === "a VIII-a") return ["Gimnaziu", "pregătire pentru Evaluarea Națională"];
+  return ({ "Matematică-informatică":"M_mate-info", "Științe ale naturii":"M_șt-nat", "Tehnologic":"M_tehn" }[S.profile]
+    ? [{ "Matematică-informatică":"M_mate-info", "Științe ale naturii":"M_șt-nat", "Tehnologic":"M_tehn" }[S.profile], "aleasă după profilul tău"]
+    : ["Trunchi comun", "aleasă după profilul tău"]);
+};
+const gradeShort = () => (S.grade || "a IX-a");
+
+/* diagnostic: questions ordered by difficulty; one per chapter */
+const DIAG = [
+  {ch:"Funcția de gradul I", lvl:1, q:"Care e soluția ecuației", f:"2x − 6 = 0 ?", o:["x = 3","x = −3","x = 6","x = 12"], a:0},
+  {ch:"Ecuația de gradul II", lvl:1, q:"Cât e Δ pentru ecuația", f:"x² − 5x + 6 = 0 ?", o:["Δ = 1","Δ = 49","Δ = −1","Δ = 25"], a:0},
+  {ch:"Relațiile lui Viète", lvl:2, q:"Pentru x² − 7x + 10 = 0,", f:"cât e x₁ + x₂ ?", o:["7","−7","10","3"], a:0},
+  {ch:"Vârful parabolei", lvl:2, q:"Care e vârful parabolei", f:"f(x) = x² − 4x + 3 ?", o:["V(2, −1)","V(−2, 15)","V(4, 3)"], a:0},
+  {ch:"Semnul funcției", lvl:3, q:"Pentru f(x) = x² − 4x + 3,", f:"unde e f(x) < 0 ?", o:["x ∈ (1, 3)","x ∈ (−∞, 1)","x > 3","nicăieri"], a:0},
+  {ch:"Inecuații de gradul II", lvl:3, q:"Soluția inecuației", f:"x² − 9 ≤ 0 este:", o:["x ∈ [−3, 3]","x ∈ (−∞, −3]","x ∈ [3, ∞)","x ∈ (−3, 3)"], a:0},
+];
+const DEMO_MAP = [["Funcția de gradul I","k",92],["Ecuația de gradul II","k",85],["Relațiile lui Viète","h",55],["Vârful parabolei","h",48],["Semnul funcției","w",22],["Inecuații de gradul II","w",15],["Vectori în plan","n",0]];
+const mapRows = () => {
+  if (!S.diag || S.diag.skipped || !S.diag.done) return DEMO_MAP;
+  const rows = DIAG.map((q, i) => {
+    const r = S.diag.res[i];
+    if (r === undefined) return [q.ch, "n", 0];
+    if (r === "ok") return [q.ch, "k", 80 + ((i * 7) % 15)];
+    if (r === "idk") return [q.ch, "w", 12 + i * 2];
+    return [q.ch, q.lvl < 3 ? "h" : "w", q.lvl < 3 ? 45 + i * 3 : 20];
+  });
+  rows.push(["Vectori în plan", "n", 0]);
+  return rows;
+};
+const LVL = { k:["știi","#22A883"], h:["pe jumătate","#E3A21A"], w:["de lucrat","#E5532F"], n:["netestat","#9AA0B2"] };
+const ready = () => { const rows = mapRows(); return Math.min(96, Math.round(rows.reduce((s, r) => s + r[2], 0) / rows.length + 18 + S.lessonDone * 6)); };
+
+/* ================= walls ================= */
+const BL = { b:"#5C78FF", c:"#FF8A6B", y:"#FFD66E", m:"#7FE3C8" };
+const WALLS = {
+  welcome:[[300,300,-100,-60,"b",.85],[260,250,220,120,"c",.8],[300,280,-80,460,"y",.9],[260,240,210,640,"m",.85]],
+  login:[[320,300,150,-90,"b",.8],[280,260,-120,300,"y",.85],[300,280,190,560,"c",.7]],
+  code:[[300,280,-90,-40,"m",.85],[300,300,200,260,"b",.75],[300,260,-60,620,"y",.85]],
+  klass:[[300,300,-100,-80,"b",.75],[260,250,220,260,"c",.7],[300,280,-60,560,"m",.8],[260,240,200,680,"y",.85]],
+  subj:[[300,280,160,-60,"c",.75],[300,300,-110,240,"b",.7],[280,260,180,520,"y",.85],[260,240,-60,700,"m",.8]],
+  diag:[[300,300,170,-80,"m",.85],[300,300,-120,300,"b",.7],[300,260,160,600,"c",.7]],
+  map:[[300,300,-100,-60,"m",.85],[300,280,200,280,"c",.7],[300,260,-80,600,"y",.85]],
+  plan:[[300,300,150,-80,"b",.8],[300,280,-120,330,"m",.8],[280,260,170,620,"c",.7]],
+  home:[[300,300,-90,-70,"b",.9],[250,250,230,150,"c",.85],[300,280,-70,430,"y",.9],[260,240,210,620,"m",.85]],
+  chat:[[280,260,180,-60,"c",.75],[320,300,-120,240,"b",.75],[280,260,160,560,"y",.85]],
+  cards:[[300,280,-80,-40,"m",.95],[300,300,200,220,"b",.8],[300,260,-60,600,"c",.75]],
+  me:[[300,300,150,-80,"b",.9],[280,260,-110,260,"y",.9],[280,260,200,520,"c",.8]],
+};
+const wall = (k) => `<div class="wall">${(WALLS[k] || WALLS.home).map(([w,h,x,y,c,o]) => `<div class="b" style="width:${w}px;height:${h}px;left:${x}px;top:${y}px;background:${BL[c]};opacity:${o}"></div>`).join("")}<div class="grid"></div></div>`;
+const backBtn = (act = "back") => `<button class="glass circle frost tap" data-act="${act}" aria-label="Înapoi">${I.chev}</button>`;
+const topbar = (step) => `<div class="topbar">${backBtn()}<div class="segs">${[0,1,2,3,4].map(i => `<i class="${i < step ? "on" : ""}"></i>`).join("")}</div><span style="font-size:13px;font-weight:650;color:var(--muted)">${step}/5</span></div>`;
+
+/* ================= pages ================= */
+const P = {};
+
+P.welcome = () => `${wall("welcome")}<div class="pg">
+  <div class="scroll" style="display:flex;flex-direction:column">
+    <div class="collage">
+      <div class="float1" style="position:absolute;left:12px;top:14px;width:200px"><div class="glass frost" style="padding:14px 16px;border-radius:22px;transform:rotate(-6deg)">
+        <div class="lbl" style="color:var(--pix)">Matematică</div><div style="font-size:19px;font-weight:700;margin-top:4px">Δ = b² − 4ac</div><div class="muted" style="font-size:12.5px;margin-top:2px">„dar de ce minus?”</div></div></div>
+      <div class="float2" style="position:absolute;right:0;top:96px;width:176px"><div class="glass" style="padding:14px 16px;border-radius:22px;transform:rotate(5deg)">
+        <div class="lbl" style="color:#1d9e78">Biologie</div><div style="font-size:18px;font-weight:700;margin-top:4px">Fotosinteza</div><div class="muted" style="font-size:12.5px;margin-top:2px">în 3 pași, nu în 3 pagini</div></div></div>
+      <div class="float3" style="position:absolute;left:26px;top:182px;width:186px"><div class="glass" style="padding:14px 16px;border-radius:22px;transform:rotate(-2deg)">
+        <div class="lbl" style="color:var(--coral-d)">Română</div><div style="font-size:18px;font-weight:700;margin-top:4px">Metafora</div><div class="muted" style="font-size:12.5px;margin-top:2px">cu exemple din Eminescu</div></div></div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:240px">
+      ${LOGO(92)}
+      <div style="font-size:52px;font-weight:800;letter-spacing:-2px;margin-top:14px">caiet<span style="color:var(--gold)">.</span></div>
+      <div style="font-size:17px;color:#3a3f4f;text-align:center;line-height:1.35;margin-top:4px">Lecțiile tale, explicate<br>pe înțelesul tău.</div>
+    </div>
+  </div>
+  <div class="foot">
+    <button class="cta tap" data-act="go" data-arg="login">Hai să începem</button>
+    <button class="glass frost gbtn tap" data-act="haveAccount">Am deja cont</button>
+  </div></div>`;
+
+P.login = () => `${wall("login")}<div class="pg">
+  <div class="hdr">${backBtn()}</div>
+  <div class="scroll">
+    <h1 class="h1">Intră în cont</h1>
+    <p class="sub" style="font-size:16px;margin-top:8px">Durează un minut. Nu ai nevoie de parolă.</p>
+    <div class="stack" style="gap:10px;margin-top:22px">
+      <button class="gbtn tap" data-act="sso" data-arg="Apple" style="background:#0d0e12;color:#fff;height:54px;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 8px 18px -8px rgba(0,0,0,.6)">Continuă cu Apple</button>
+      <button class="glass frost gbtn tap" data-act="sso" data-arg="Google" style="height:54px">Continuă cu Google</button>
+      <button class="glass gbtn tap" data-act="emailSheet" style="height:54px">${I.mail()}Continuă cu emailul</button>
+    </div>
+    <div class="row" style="gap:12px;margin:22px 12px 0"><div style="flex:1;height:1px;background:rgba(20,22,31,.15)"></div><span style="font-size:13px;color:var(--muted);font-weight:600">sau</span><div style="flex:1;height:1px;background:rgba(20,22,31,.15)"></div></div>
+    <label for="classCode" style="display:block;font-size:14px;font-weight:600;color:#3a3f4f;margin:18px 2px 0">Ai un cod de clasă de la profesor?</label>
+    <form class="glass frost field" style="margin-top:9px;height:54px;border-radius:18px;padding:0 8px 0 16px" data-form="classCode">
+      <input id="classCode" autocomplete="off" autocapitalize="characters" placeholder="ex. MATE-9B" style="letter-spacing:1.5px;font-weight:600" value="${esc(S.classCode)}">
+      <button type="submit" class="circle tap" style="width:40px;height:40px;background:rgba(20,22,31,.07)" aria-label="Intră în clasă">${I.arrow}</button>
+    </form>
+  </div>
+  <div class="foot">
+    <div class="glass card" style="padding:14px 16px;border-radius:22px"><div class="row" style="gap:12px;align-items:flex-start">
+      <div class="circle" style="width:34px;height:34px;background:rgba(36,71,214,.14)">${I.shield}</div>
+      <div style="font-size:13.5px;line-height:1.38;color:#2c3040"><b>Ai sub 16 ani?</b> Îi trimitem un email unui părinte, ca să confirme contul.</div></div></div>
+    <div style="text-align:center;font-size:11.5px;line-height:1.4;color:#5a6075;padding:0 12px">Continuând, ești de acord cu Termenii și cu Politica de confidențialitate.</div>
+  </div></div>`;
+
+P.code = () => `${wall("code")}<div class="pg">
+  <div class="hdr">${backBtn()}</div>
+  <div class="scroll" style="padding-bottom:8px">
+    <h1 class="h1">Verifică emailul</h1>
+    <p class="sub" style="font-size:16px;margin-top:8px">Ți-am trimis un cod de 6 cifre pe<br><b>${esc(maskEmail(S.email || "ioana@gmail.com"))}</b></p>
+    <div class="row between" id="codeBoxes" style="margin-top:22px;gap:6px"></div>
+    <div style="margin-top:16px;font-size:14px;color:var(--muted)" id="resend"></div>
+    <div class="glass frost card" style="margin-top:16px;padding:14px 16px;border-radius:22px"><div class="row" style="gap:12px;align-items:flex-start">
+      <div class="circle" style="width:34px;height:34px;background:rgba(47,191,148,.18)">${I.mail("#1d9e78")}</div>
+      <div style="font-size:13.5px;line-height:1.38;color:#2c3040"><b>Și un părinte primește un email.</b> Contul se activează după ce apasă „Confirm”.</div></div></div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--soft);text-align:center">În demo merge orice cod de 6 cifre.</div>
+  </div>
+  <div class="foot" style="padding:0 8px calc(var(--bot) - 8px)">
+    <div class="glass" style="padding:10px 8px 14px;border-radius:30px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="keypad">
+      ${[["1",""],["2","ABC"],["3","DEF"],["4","GHI"],["5","JKL"],["6","MNO"],["7","PQRS"],["8","TUV"],["9","WXYZ"]].map(([d,l]) => key(d,l)).join("")}
+      <div></div>${key("0","")}
+      <button class="tap" data-act="key" data-arg="del" aria-label="Șterge" style="height:50px;display:flex;align-items:center;justify-content:center"><svg width="26" height="20" viewBox="0 0 26 20" fill="none" stroke="#14161F" stroke-width="1.9" stroke-linejoin="round"><path d="M8 2h15a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8l-7-8z"/><path d="M12 7l6 6M18 7l-6 6" stroke-linecap="round"/></svg></button>
+    </div>
+  </div></div>`;
+function key(d, l) {
+  return `<button class="glass frost tap" data-act="key" data-arg="${d}" style="height:50px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+    <span style="font-size:22px;font-weight:500;line-height:1">${d}</span>${l ? `<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--muted);margin-top:1px">${l}</span>` : ""}</button>`;
+}
+function maskEmail(e) { const [u, d] = e.split("@"); return (u ? u[0] : "i") + "•••••@" + (d || "gmail.com"); }
+
+P.klass = () => {
+  const ok = S.grade && (S.grade === "a VIII-a" || S.profile);
+  return `${wall("klass")}<div class="pg">${topbar(2)}
+  <div class="scroll">
+    <h1 class="h1 s30">În ce clasă ești?</h1>
+    <div class="chips3" style="margin-top:16px">${GRADES.map(g => `<button class="chip glass frost tap ${S.grade === g ? "on" : ""}" data-act="grade" data-arg="${g}">${g}</button>`).join("")}</div>
+    ${S.grade === "a VIII-a"
+      ? `<div class="glass frost card" style="margin-top:20px;border-radius:22px"><div class="lbl" style="color:var(--pix)">Clasa a VIII-a</div><div style="font-size:15px;line-height:1.4;margin-top:6px">Nu alegi profil. Lecțiile și testele sunt pentru Evaluarea Națională.</div></div>`
+      : `<div class="lbl" style="margin:20px 4px 10px">Ce profil ai?</div>
+         <div class="stack" style="gap:7px">${PROFILES.map(p => `<button class="glass ${S.profile === p ? "" : "frost"} prow tap ${S.profile === p ? "on" : ""}" data-act="profile" data-arg="${p}"><span>${p}</span>${S.profile === p ? I.check() : '<span class="radio"></span>'}</button>`).join("")}</div>`}
+    <label for="school" class="lbl" style="display:block;margin:20px 4px 8px">Școala ta · opțional</label>
+    <div class="glass frost field">${I.search}<input id="school" placeholder="Caută după nume sau oraș" value="${esc(S.school)}" autocomplete="off"></div>
+  </div>
+  <div class="foot"><button class="cta tap" data-act="go" data-arg="subj" ${ok ? "" : "disabled"}>Continuă</button></div></div>`;
+};
+
+P.subj = () => {
+  const any = Object.values(S.subjects).some(Boolean);
+  const [pr, why] = program();
+  return `${wall("subj")}<div class="pg">${topbar(3)}
+  <div class="scroll">
+    <h1 class="h1 s30">Ce materii vrei aici?</h1>
+    <p class="sub">Le poți schimba oricând din profil.</p>
+    <div class="glass frost" style="margin-top:16px;padding:4px;border-radius:24px">
+      ${SUBJ.map((s, i) => `${i ? '<div class="sep"></div>' : ""}<button class="srow tap" data-act="toggleSubj" data-arg="${s.k}" role="switch" aria-checked="${S.subjects[s.k]}">
+        <span class="row" style="gap:12px"><span class="sic" style="background:${s.c}">${s.g}</span><span style="font-size:16px;font-weight:${S.subjects[s.k] ? 650 : 550};color:${S.subjects[s.k] ? "#14161F" : "#4a5068"}">${s.n}</span></span>
+        <span class="sw ${S.subjects[s.k] ? "on" : ""}"></span></button>`).join("")}
+    </div>
+    ${S.subjects.mate ? `<div class="glass card" style="margin-top:14px;padding:14px 16px;border-radius:22px">
+      <div class="row between"><span style="font-size:13px;font-weight:600;color:var(--muted)">Programa la mate</span><button class="tap" style="font-size:13px;font-weight:650;color:var(--pix)" data-act="back">Schimbă</button></div>
+      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><span class="pill" style="background:rgba(36,71,214,.14);color:var(--pix);font-size:13px">${pr}</span><span style="font-size:13px;color:var(--muted)">${why}</span></div></div>` : ""}
+  </div>
+  <div class="foot"><button class="cta tap" data-act="go" data-arg="diag" ${any ? "" : "disabled"}>Continuă</button></div></div>`;
+};
+
+P.diag = () => {
+  const d = S.diag;
+  const i = d.i, q = DIAG[i];
+  const segs = DIAG.map((_, k) => { const r = d.res[k]; const c = r === "ok" ? "#2FBF94" : r ? "#FF8A6B" : k === i ? "#2447D6" : "rgba(20,22,31,.12)"; return `<i style="flex:1;height:5px;border-radius:3px;background:${c};display:block"></i>`; }).join("");
+  const left = Math.max(1, Math.round((DIAG.length - i) * 0.8));
+  return `${wall("diag")}<div class="pg">${topbar(4)}
+  <div class="scroll">
+    <div class="lbl" style="color:var(--pix)">Ce știi deja · Matematică</div>
+    <div class="row between" style="margin-top:8px"><span style="font-size:15px;font-weight:650">Întrebarea ${i + 1}</span><span style="font-size:13px;color:var(--muted);font-weight:600">≈ ${left} min rămase</span></div>
+    <div class="row" style="gap:4px;margin-top:8px">${segs}</div>
+    <div class="glass frost card" style="margin-top:16px;padding:20px 18px 18px;border-radius:30px" id="qcard">
+      <div style="font-size:21px;font-weight:700;letter-spacing:-.4px;line-height:1.25">${q.q}</div>
+      <div style="font-size:23px;font-weight:700;margin-top:6px;color:var(--pix)">${q.f}</div>
+      <div class="stack" style="gap:9px;margin-top:14px">
+        ${q.o.map((o, k) => `<button class="glass opt tap" data-act="answer" data-arg="${k}">${o}</button>`).join("")}
+        <button class="opt dash tap" data-act="answer" data-arg="-1">Nu știu încă</button>
+      </div>
+    </div>
+    <div class="glass card" style="margin-top:14px;padding:14px 16px;border-radius:22px;font-size:13.5px;line-height:1.4;color:#2c3040"><b>Nu e notă.</b> Testul se oprește singur când e destul de sigur ce știi.</div>
+  </div>
+  <div class="foot"><button class="tap" data-act="skipDiag" style="height:44px;font-size:15px;font-weight:650;color:var(--pix)">Sar peste test deocamdată</button></div></div>`;
+};
+
+P.map = () => {
+  const rows = mapRows();
+  return `${wall("map")}<div class="pg">
+  <div class="hdr">${backBtn()}</div>
+  <div class="scroll">
+    <div class="lbl" style="color:var(--pix)">${S.diag && S.diag.skipped ? "Fără test, deocamdată" : "Rezultatul testului"}</div>
+    <h1 class="h1" style="font-size:31px;margin-top:6px">Harta ta la mate</h1>
+    <div class="row" style="gap:12px;margin-top:12px;flex-wrap:wrap">${Object.values(LVL).map(([t, c]) => `<span class="row" style="gap:5px;font-size:12px;font-weight:600;color:#3a3f4f"><span class="dot9" style="background:${c}"></span>${cap(t)}</span>`).join("")}</div>
+    <div class="glass frost" style="margin-top:16px;padding:6px 16px 8px;border-radius:26px">
+      ${rows.map(([t, l, w]) => `<div class="mrow"><div class="row between"><span style="font-size:15px;font-weight:600">${t}</span><span style="font-size:12px;font-weight:650;color:${LVL[l][1]}">${LVL[l][0]}</span></div>
+        <div class="mtrack"><i data-w="${w}" style="background:${LVL[l][1]}"></i></div></div>`).join("")}
+    </div>
+    ${S.diag && S.diag.skipped ? `<p class="sub" style="font-size:13.5px;margin-top:12px">Ai sărit peste test, așa că harta e un exemplu. Testul îl poți face oricând din „Eu”.</p>` : ""}
+  </div>
+  <div class="foot"><button class="cta ink tap" data-act="go" data-arg="plan">Vezi planul</button></div></div>`;
+};
+
+const tezeList = () => {
+  const list = [{n:"Matematică", days:2}, {n:"Limba română", days:15}, ...S.extraTeze];
+  return list.sort((a, b) => a.days - b.days);
+};
+P.plan = () => {
+  const teze = tezeList();
+  const first = teze[0];
+  const hint = S.minutes < 20 ? `Cu ${S.minutes} minute pe zi, recapitularea pentru teza ${first.days < 3 ? "de " + ZILE[addDays(first.days).getDay()] : "următoare"} e cam strânsă.`
+    : `Pentru teza de ${ZILE[addDays(first.days).getDay()]} ajung ${S.minutes} de minute pe zi.`;
+  return `${wall("plan")}<div class="pg">${topbar(5)}
+  <div class="scroll">
+    <h1 class="h1" style="font-size:31px">Planul tău</h1>
+    <div class="glass frost" style="margin-top:16px;padding:14px 16px 8px;border-radius:24px">
+      <div style="font-size:13px;font-weight:600;color:var(--muted)">Teze și lucrări</div>
+      ${teze.map((t, i) => `${i ? '<div style="height:1px;background:rgba(20,22,31,.07);margin:10px 0"></div>' : '<div style="height:10px"></div>'}
+        <div class="row between"><div><div style="font-size:16px;font-weight:650">${esc(t.n)}</div><div style="font-size:13px;color:var(--muted)">${fmtDay(addDays(t.days))}</div></div>
+        ${t.days <= 3 ? `<span class="pill" style="background:rgba(255,107,74,.16);color:var(--coral-d);padding:6px 10px;font-size:12.5px">${inDays(t.days)}</span>` : `<span style="font-size:13px;color:var(--muted);font-weight:600">${inDays(t.days)}</span>`}</div>`).join("")}
+      <div style="height:1px;background:rgba(20,22,31,.07);margin:10px 0"></div>
+      <button class="tap" data-act="addTeza" style="font-size:15px;font-weight:650;color:var(--pix);padding-bottom:6px">+ Adaugă o teză</button>
+    </div>
+    <div class="glass card" style="margin-top:12px;padding:14px 16px;border-radius:24px">
+      <div style="font-size:13px;font-weight:600;color:var(--muted)">Cât timp ai pe zi? <span style="font-weight:500">(minute)</span></div>
+      <div class="row" style="gap:4px;margin-top:10px;padding:4px;border-radius:15px;background:rgba(20,22,31,.06)" role="radiogroup" aria-label="Minute pe zi">
+        ${[10,20,30,45].map(v => `<button class="tap" role="radio" aria-checked="${S.minutes === v}" data-act="minutes" data-arg="${v}" style="flex:1;height:40px;border-radius:12px;font-size:15px;font-weight:650;${S.minutes === v ? "background:#fff;color:var(--pix);box-shadow:0 2px 8px rgba(30,40,90,.15)" : "color:#3a3f4f"}">${v}</button>`).join("")}
+      </div>
+      <div style="font-size:12.5px;color:${S.minutes < 20 ? "var(--coral-d)" : "var(--mint-d)"};font-weight:600;margin-top:8px">${hint}</div>
+    </div>
+    <div class="glass card" style="margin-top:12px;padding:14px 16px;border-radius:24px">
+      <div class="row between"><div><div style="font-size:13px;font-weight:600;color:var(--muted)">Când să-ți amintesc?</div>
+        <div class="row" style="gap:8px;margin-top:6px"><span style="font-size:15px;font-weight:600">În fiecare zi la</span><button class="glass frost pill tap" data-act="remindTime" style="font-size:15px;padding:6px 12px;color:#14161F">${S.remind}</button></div></div>
+        <button class="sw tap ${S.remindOn ? "on" : ""}" data-act="remindToggle" role="switch" aria-checked="${S.remindOn}" aria-label="Notificare zilnică"></button></div>
+    </div>
+  </div>
+  <div class="foot"><button class="cta tap" data-act="finish">Gata, hai să învățăm</button></div></div>`;
+};
+
+P.home = () => {
+  const now = new Date(), h = now.getHours();
+  const greet = h < 11 ? "Bună dimineața" : h < 18 ? "Bună ziua" : "Bună seara";
+  const act = S.subjects[S.active] ? S.active : (SUBJ.find(s => S.subjects[s.k]) || SUBJ[0]).k;
+  const H = HERO[act];
+  const prog = act === "mate" ? Math.min(100, 62 + S.lessonDone * 13) : 35;
+  const subjOn = SUBJ.filter(s => S.subjects[s.k]);
+  return `${wall("home")}<div class="pg">
+  <div class="scroll" style="padding-bottom:120px">
+    <div class="row between" style="align-items:flex-start">
+      <div><div class="lbl">${cap(fmtDay(now))}</div><h1 class="h1" style="margin-top:6px">${greet},<br>${esc(S.name)}</h1></div>
+      <button class="glass circle frost tap" data-act="tab" data-arg="me" style="font-weight:700;font-size:17px;color:var(--pix)" aria-label="Profilul tău">${esc(S.name[0] || "I")}</button>
+    </div>
+    <div class="glass frost card" style="margin-top:18px;padding:18px;border-radius:30px">
+      <div class="row between"><span class="pill" style="background:rgba(255,107,74,.16);color:var(--coral-d)">TEZĂ · ${ZILE[addDays(H.days).getDay()].toUpperCase()}</span><span style="font-size:13px;font-weight:600;color:var(--muted)">${inDays(H.days)}</span></div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.5px;margin-top:12px">${H.topic}</div>
+      <div class="muted" style="font-size:14px;margin-top:3px;color:var(--soft)">${act === "mate" && S.lessonDone ? `${Math.max(0, 3 - S.lessonDone)} lecții rămase · cam ${Math.max(10, 40 - S.lessonDone * 13)} de minute` : H.left}</div>
+      <div class="row" style="gap:10px;margin-top:14px"><div style="flex:1;height:8px;border-radius:5px;background:rgba(20,22,31,.08);overflow:hidden"><div class="grow" data-w="${prog}" style="width:0;height:100%;border-radius:5px;background:linear-gradient(90deg,#2447D6,#5C78FF);transition:width .9s var(--ease)"></div></div><span style="font-size:13px;font-weight:650">${prog}%</span></div>
+      <button class="cta tap" style="margin-top:16px;height:50px" data-act="continue" data-arg="${act}">Continuă de unde ai rămas ${I.arrow}</button>
+    </div>
+    <div class="row" style="gap:12px;margin-top:12px;align-items:stretch">
+      <button class="glass tap" data-act="go" data-arg="cards" style="flex:1;padding:15px;border-radius:26px;text-align:left">
+        <span class="circle" style="width:34px;height:34px;background:rgba(36,71,214,.14)">${I.cards("#2447D6")}</span>
+        <div style="font-size:13px;font-weight:600;color:#3a3f4f;margin-top:10px">Cartonașe</div>
+        <div style="font-size:26px;font-weight:700;letter-spacing:-.6px">${S.cardsDue} <span style="font-size:13px;font-weight:550;color:var(--muted);letter-spacing:0">de repetat</span></div></button>
+      <button class="glass tap" data-act="streak" style="flex:1;padding:15px;border-radius:26px;text-align:left">
+        <span class="circle" style="width:34px;height:34px;background:rgba(255,107,74,.16)">${I.flame}</span>
+        <div style="font-size:13px;font-weight:600;color:#3a3f4f;margin-top:10px">Serie</div>
+        <div style="font-size:26px;font-weight:700;letter-spacing:-.6px">${S.streak} <span style="font-size:13px;font-weight:550;color:var(--muted);letter-spacing:0">zile la rând</span></div></button>
+    </div>
+    <button class="glass tap" data-act="ieri" style="margin-top:12px;padding:14px 14px 14px 16px;border-radius:24px;width:100%;text-align:left">
+      <div class="row between" style="gap:10px"><div><div style="font-size:12.5px;font-weight:600;color:var(--muted)">Ieri te-ai încurcat la</div>
+      <div style="font-size:16px;font-weight:650;margin-top:2px;letter-spacing:-.2px">Δ negativ. Ce înseamnă, de fapt?</div></div>
+      <span class="glass pill frost" style="color:var(--pix);font-size:12.5px">2 min</span></div></button>
+    <div class="lbl" style="margin-top:18px">Materiile tale</div>
+    <div class="row" style="gap:8px;margin:9px -18px 0;padding:0 18px 6px;overflow-x:auto;scrollbar-width:none">
+      ${subjOn.map(s => `<button class="glass pill tap" data-act="subject" data-arg="${s.k}" style="font-size:14px;padding:10px 15px;letter-spacing:0;${s.k === act ? "color:#fff;background:rgba(36,71,214,.85)" : "color:#14161F"}">${s.n}</button>`).join("")}
+    </div>
+  </div>
+  ${tabbar("home")}</div>`;
+};
+const tabbar = (on) => `<nav class="tabbar glass" aria-label="Navigare">
+    <button class="tab tap ${on === "home" ? "on" : ""}" data-act="tab" data-arg="home">${I.sun(on === "home" ? "#2447D6" : "#3a3f4f")}Azi</button>
+    <button class="tab tap" data-act="go" data-arg="cards">${I.cards("#3a3f4f")}Cartonașe</button>
+    <button class="tab tap ${on === "me" ? "on" : ""}" data-act="tab" data-arg="me">${I.user(on === "me" ? "#2447D6" : "#3a3f4f", on === "me")}Eu</button>
+  </nav><button class="fab glass tap" data-act="go" data-arg="scan" data-mode="up" aria-label="Scanează un exercițiu">${I.cam}</button>`;
+
+P.scan = () => `<div class="cam">
+    <div class="desk"></div>
+    <div class="paper" id="paper">
+      <div class="hw" style="left:15%;top:7%;font-size:34px">Tema pt. vineri</div>
+      <div class="hw" style="left:15%;top:14%;font-size:29px">Ex. 4. Rezolvați în R:</div>
+      <div class="hw" style="left:19%;top:27%;font-size:36px;font-weight:600">a) x² − 5x + 6 = 0</div>
+      <div class="hw" style="left:19%;top:37%;font-size:33px">b) 2x² + 3x − 2 = 0</div>
+      <div class="hw" style="left:19%;top:45%;font-size:33px">c) x² + 4 = 0</div>
+      <div class="hw" style="left:64%;top:44%;font-size:26px;color:#c0392b;transform:rotate(-6deg)">??</div>
+      <div class="scanbox" id="scanbox"><div class="scanline"></div></div>
+    </div>
+    <video id="camVideo" playsinline muted autoplay></video>
+    <div class="vign"></div>
+  </div>
+  <div class="flash" id="flash"></div>
+  <div class="pg">
+    <div class="hdr" style="position:relative;z-index:5">
+      <button class="glass dk circle tap" data-act="back" aria-label="Închide" style="color:#fff">${I.x}</button>
+      <span class="glass dk pill" style="color:#fff;font-size:14px;font-weight:600;padding:12px 16px;letter-spacing:0">Matematică · ${gradeShort()}</span>
+      <button class="glass dk circle tap" data-act="flashToggle" aria-label="Bliț" id="flashBtn">${I.bolt("#FFD66E")}</button>
+    </div>
+    <div style="flex:1"></div>
+    <div class="foot" id="scanFoot" style="align-items:center;gap:14px">
+      <div style="color:#fff;font-size:14px;font-weight:600;text-shadow:0 1px 6px rgba(0,0,0,.6)" id="scanHint">Încadrează exercițiul și apasă butonul</div>
+      <div class="row" style="width:100%;justify-content:space-between;padding:0 18px">
+        <button class="glass dk circle tap" data-act="realCam" style="width:52px;height:52px;color:#fff" aria-label="Folosește camera telefonului">${I.cam.replace('width="26" height="26"','width="22" height="22"')}</button>
+        <button class="glass dk shutter tap" data-act="shoot" aria-label="Fă poza"><i></i></button>
+        <span style="width:52px"></span>
+      </div>
+    </div>
+  </div>`;
+
+P.chat = (mode) => `${wall("chat")}<div class="pg">
+  <div class="hdr">
+    ${backBtn()}
+    <div class="glass frost" style="border-radius:999px;padding:7px 18px;text-align:center">
+      <div style="font-size:15px;font-weight:700;letter-spacing:-.2px">x² − 5x + 6 = 0</div>
+      <div class="row" style="gap:5px;justify-content:center;margin-top:3px"><span style="font-size:11.5px;font-weight:600;color:#555c70" id="stepLbl">Pasul 1 din 4</span><span class="row" style="gap:3px" id="stepDots"></span></div>
+    </div>
+    <button class="glass circle frost tap" data-act="chatHelp" style="font-weight:700;font-size:15px;color:var(--pix)" aria-label="Cum funcționează">?</button>
+  </div>
+  <div class="scroll" id="chatScroll"><div class="msgs" id="msgs">
+    <div class="row" style="gap:7px;margin-left:2px"><div style="width:22px;height:22px;border-radius:7px;background:linear-gradient(160deg,#4F6DFF,#2040C8);color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center">c<span style="color:#FFD66E">.</span></div><span style="font-size:12px;font-weight:600;color:var(--muted)">Caiet</span></div>
+  </div></div>
+  <div class="foot" style="gap:10px">
+    <div class="qchips" id="qchips"></div>
+    <form class="composer" data-form="chat">
+      <label class="glass frost field" style="cursor:text"><input id="chatIn" autocomplete="off" inputmode="text" placeholder="Scrie răspunsul…" aria-label="Răspunsul tău">
+        <button type="button" class="circle tap" data-act="mic" style="width:38px;height:38px;background:rgba(20,22,31,.06)" aria-label="Dictează">${I.mic}</button></label>
+      <button class="send tap" type="submit" aria-label="Trimite">${I.up}</button>
+    </form>
+  </div></div>`;
+
+const DECK = [
+  {t:"Funcții", q:"Dacă Δ < 0, câte soluții reale are ecuația?", o:["Două","Una singură","Niciuna","Depinde de a"], a:2, e:"Exact. Parabola nu atinge deloc axa Ox.", svg:true},
+  {t:"Ecuații", q:"Formula lui Δ este:", o:["b² − 4ac","b² + 4ac","4ac − b²","b − 4ac"], a:0, e:"Da. Discriminantul: Δ = b² − 4ac."},
+  {t:"Funcții", q:"Abscisa vârfului parabolei este:", o:["x = −b / 2a","x = b / 2a","x = −Δ / 4a","x = −b / a"], a:0, e:"Corect. Iar ordonata e −Δ / 4a."},
+  {t:"Funcții", q:"Dacă a > 0, parabola are ramurile:", o:["În sus","În jos","Depinde de Δ"], a:0, e:"Da. Cu a > 0, parabola „zâmbește”."},
+  {t:"Relațiile lui Viète", q:"Pentru x² − 7x + 10 = 0, cât e x₁ · x₂ ?", o:["10","7","−10","−7"], a:0, e:"Corect: produsul e c / a = 10."},
+];
+let deck = { i:0, picked:null, known:0, again:0 };
+P.cards = () => {
+  if (deck.i >= DECK.length) return `${wall("cards")}<div class="pg">
+    <div class="hdr">${backBtn()}<div style="font-size:17px;font-weight:700">Cartonașe</div><span style="width:46px"></span></div>
+    <div class="scroll" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="glass frost card" style="padding:26px 22px;border-radius:32px;text-align:center">
+        <div style="display:flex;justify-content:center">${I.check("#2FBF94", 54)}</div>
+        <div style="font-size:24px;font-weight:700;letter-spacing:-.5px;margin-top:14px">Gata pe azi!</div>
+        <div class="sub" style="margin-top:8px">${deck.known} le știai, ${deck.again} revin mâine. Pe cele știute le mai vezi peste câteva zile, ca să nu se ducă.</div>
+      </div>
+    </div>
+    <div class="foot"><button class="cta tap" data-act="cardsDone">Înapoi la Azi</button><button class="glass frost gbtn tap" data-act="cardsAgain">Mai fac o tură</button></div></div>`;
+  const c = DECK[deck.i];
+  const st = (k) => deck.picked === null ? "" : k === c.a ? "good" : k === deck.picked ? "bad" : "";
+  return `${wall("cards")}<div class="pg">
+  <div class="hdr">${backBtn()}<div style="font-size:17px;font-weight:700;letter-spacing:-.3px">Cartonașe</div><span class="glass pill frost" style="font-size:14px;padding:10px 14px;color:#14161F;letter-spacing:0">${deck.i + 1} / ${DECK.length}</span></div>
+  <div style="margin:0 20px 14px;height:6px;border-radius:4px;background:rgba(20,22,31,.08)"><div style="width:${(deck.i / DECK.length) * 100}%;height:100%;border-radius:4px;background:var(--pix);transition:width .5s var(--ease)"></div></div>
+  <div class="scroll">
+    <div class="glass frost card" style="padding:20px 18px 18px;border-radius:34px">
+      <div class="lbl">${c.t} · întrebare</div>
+      <div style="font-size:23px;font-weight:700;letter-spacing:-.5px;line-height:1.2;margin-top:8px">${c.q}</div>
+      ${c.svg ? `<svg width="100%" height="96" viewBox="0 0 326 96" style="margin-top:10px" aria-hidden="true"><line x1="8" y1="80" x2="318" y2="80" stroke="#14161F" stroke-opacity=".35" stroke-width="1.5"/><line x1="163" y1="6" x2="163" y2="90" stroke="#14161F" stroke-opacity=".2" stroke-width="1.5"/><path d="M83 6 Q163 100 243 6" fill="none" stroke="#2447D6" stroke-width="3" stroke-linecap="round"/><text x="300" y="74" font-size="12" fill="#4a5068">Ox</text></svg>` : ""}
+      <div class="stack" style="gap:9px;margin-top:12px">
+        ${c.o.map((o, k) => `<button class="glass opt tap ${st(k)}" data-act="pickCard" data-arg="${k}" ${deck.picked !== null ? "disabled" : ""}><span>${o}</span>${st(k) === "good" ? I.check("#2FBF94") : st(k) === "bad" ? I.cross() : ""}</button>`).join("")}
+      </div>
+      ${deck.picked !== null ? `<div style="font-size:14px;font-weight:600;margin-top:12px;color:${deck.picked === c.a ? "var(--mint-d)" : "var(--coral-d)"}">${deck.picked === c.a ? c.e : "Nu chiar. " + c.e.replace(/^(Exact|Da|Corect)\.?:?\s*/, "")}</div>` : `<div style="font-size:13px;color:var(--soft);margin-top:12px">Alege un răspuns.</div>`}
+    </div>
+  </div>
+  <div class="foot"><div class="row" style="gap:10px">
+    <button class="glass frost gbtn tap" data-act="cardNext" data-arg="again" style="flex:1;height:54px" ${deck.picked === null ? "disabled" : ""}>Mai arată-mi-l</button>
+    <button class="cta tap" data-act="cardNext" data-arg="known" style="flex:1" ${deck.picked === null ? "disabled" : ""}>Îl știam</button></div></div></div>`;
+};
+
+P.me = () => {
+  const rows = mapRows();
+  const got = rows.filter(r => r[1] === "k").map(r => r[0]).slice(0, 3);
+  const work = rows.find(r => r[1] === "w") || rows.find(r => r[1] === "h");
+  const mon = addDays(-((new Date().getDay() + 6) % 7) - 7), sun = addDays(-((new Date().getDay() + 6) % 7) - 1);
+  const bars = [38,58,22,70,10,30,84], days = ["L","Ma","Mi","J","V","S","D"];
+  const r = ready(); const dash = (r / 100) * 119.4;
+  return `${wall("me")}<div class="pg">
+  <div class="scroll" style="padding-bottom:120px">
+    <div class="lbl">${mon.getDate()} ${LUNI[mon.getMonth()]} – ${sun.getDate()} ${LUNI[sun.getMonth()]}</div>
+    <h1 class="h1" style="margin-top:6px">Săptămâna ta</h1>
+    <div class="glass frost card" style="margin-top:16px;padding:18px;border-radius:30px">
+      <div style="font-size:13px;font-weight:600;color:var(--muted)">Timp învățat</div>
+      <div style="font-size:38px;font-weight:750;letter-spacing:-1.2px">3 h 20 min</div>
+      <div style="font-size:13.5px;font-weight:600;color:var(--mint-d)">+45 min față de săptămâna trecută</div>
+      <div class="bars">${bars.map((v, i) => `<div><span data-h="${v}" style="height:4px;${i === 6 ? "background:linear-gradient(180deg,#5C78FF,#2447D6)" : ""}"></span><small style="${i === 6 ? "color:var(--pix);font-weight:700" : ""}">${days[i]}</small></div>`).join("")}</div>
+    </div>
+    <div class="glass card" style="margin-top:12px;padding:16px 16px 14px;border-radius:26px">
+      <div style="font-size:13px;font-weight:600;color:var(--muted)">Ce ai prins</div>
+      ${(got.length ? got : ["Formula lui Δ"]).map(g => `<div class="row" style="gap:9px;margin-top:8px;font-size:15.5px;font-weight:600">${I.check("#2FBF94", 18)}${g}</div>`).join("")}
+      ${work ? `<div style="height:1px;background:rgba(20,22,31,.08);margin:12px 0 10px"></div>
+      <div class="row between"><span style="font-size:15.5px;font-weight:600">${work[0]}</span><span style="font-size:13px;font-weight:650;color:var(--coral-d)">mai lucrăm</span></div>
+      <div class="mtrack" style="height:7px"><i data-w="${Math.max(20, work[2])}" style="background:#FF6B4A"></i></div>` : ""}
+    </div>
+    <div class="row" style="gap:12px;margin-top:12px;align-items:stretch">
+      <div class="glass row" style="flex:1;padding:14px;border-radius:24px;gap:11px">
+        <svg width="48" height="48" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="19" fill="none" stroke="rgba(20,22,31,.10)" stroke-width="6"/><circle cx="24" cy="24" r="19" fill="none" stroke="#2447D6" stroke-width="6" stroke-linecap="round" stroke-dasharray="${dash.toFixed(1)} 120" transform="rotate(-90 24 24)"/></svg>
+        <div><div style="font-size:20px;font-weight:750">${r}%</div><div style="font-size:12px;font-weight:600;color:var(--muted);line-height:1.2">gata pentru<br>teză</div></div></div>
+      <div class="glass" style="flex:1;padding:14px;border-radius:24px"><div style="font-size:20px;font-weight:750">${S.cardsKnown}</div><div style="font-size:12px;font-weight:600;color:var(--muted);line-height:1.2">cartonașe pe care<br>le știi deja</div></div>
+    </div>
+    <div class="lbl" style="margin:22px 4px 10px">Setări</div>
+    <div class="glass frost" style="border-radius:24px;padding:4px 16px">
+      <div class="row between" style="height:54px;gap:10px"><label for="nameIn" style="font-size:15.5px;font-weight:600">Numele tău</label><input id="nameIn" value="${esc(S.name)}" maxlength="18" style="border:0;outline:0;background:transparent;text-align:right;font-size:15.5px;color:var(--pix);font-weight:600;min-width:0;width:50%"></div>
+      <div style="height:1px;background:rgba(20,22,31,.07)"></div>
+      <div class="row between" style="height:54px"><span style="font-size:15.5px;font-weight:600">Clasa</span><span style="font-size:14.5px;color:var(--muted)">${gradeShort()}${S.grade !== "a VIII-a" ? " · " + (S.profile ? S.profile.replace("Matematică-informatică","mate-info") : "mate-info") : ""}</span></div>
+      <div style="height:1px;background:rgba(20,22,31,.07)"></div>
+      <div class="row between" style="height:58px"><div><div style="font-size:15.5px;font-weight:600">Notificare zilnică</div><div style="font-size:12.5px;color:var(--muted)">la ${S.remind}, una singură</div></div><button class="sw tap ${S.remindOn ? "on" : ""}" data-act="remindToggle" role="switch" aria-checked="${S.remindOn}" aria-label="Notificare zilnică"></button></div>
+      <div style="height:1px;background:rgba(20,22,31,.07)"></div>
+      <div class="row between" style="height:58px"><div><div style="font-size:15.5px;font-weight:600">Rezumat pentru părinte</div><div style="font-size:12.5px;color:var(--muted)">o dată pe săptămână, doar dacă vrei</div></div><button class="sw tap ${S.parent ? "on" : ""}" data-act="parentToggle" role="switch" aria-checked="${S.parent}" aria-label="Rezumat pentru părinte"></button></div>
+    </div>
+    <div class="stack" style="gap:10px;margin-top:14px">
+      <button class="glass frost gbtn tap" data-act="lockDemo">${I.bell} Arată notificarea de seară</button>
+      <button class="glass gbtn tap" data-act="redoDiag">${I.redo} Refă testul de pornire</button>
+      <button class="gbtn tap" data-act="askReset" style="color:var(--coral-d);height:44px">Reia aplicația de la început</button>
+    </div>
+  </div>
+  ${tabbar("me")}</div>`;
+};
+
+P.lock = () => {
+  const now = new Date();
+  return `<div class="wall" style="background:#080C24">
+    <div class="b" style="width:340px;height:300px;left:40px;top:-120px;background:#2E4BFF;opacity:.85;filter:blur(60px)"></div>
+    <div class="b" style="width:300px;height:300px;left:-140px;top:520px;background:#FF6B4A;opacity:.75;filter:blur(70px)"></div>
+    <div class="b" style="width:280px;height:280px;left:220px;top:600px;background:#18B39A;opacity:.6;filter:blur(70px)"></div>
+    <div class="grid" style="background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px)"></div></div>
+  <div class="pg" style="color:#fff;text-align:center">
+    <div style="font-size:20px;font-weight:600;opacity:.85;margin-top:16px">${fmtDay(now)}</div>
+    <div style="font-size:108px;font-weight:700;letter-spacing:-4px;line-height:1;background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,255,255,.72));-webkit-background-clip:text;background-clip:text;color:transparent">${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}</div>
+    <div style="flex:1"></div>
+    <div style="padding:0 12px;text-align:left" class="stack">
+      <button class="glass dk tap" data-act="openNotif" style="padding:14px 15px;border-radius:26px;text-align:left;color:#fff;width:100%;animation:pop .5s .3s var(--ease) both">
+        <div class="row" style="gap:12px;align-items:flex-start">
+          <div style="width:40px;height:40px;border-radius:11px;flex:none;background:linear-gradient(160deg,#4F6DFF,#2040C8);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.35);font-weight:800;font-size:21px;letter-spacing:-1px">c<span style="color:#FFD66E">.</span></div>
+          <div style="flex:1"><div class="row between"><span style="font-size:15px;font-weight:650">Mâine e teza la mate</span><span style="font-size:13px;opacity:.6">acum</span></div>
+          <div style="font-size:15px;line-height:1.32;opacity:.88;margin-top:2px">Ți-am pus deoparte 15 minute de recapitulare, doar cu ce ai greșit săptămâna asta. Începem?</div></div></div></button>
+      <div class="glass dk" style="padding:14px 15px;border-radius:26px;margin-top:9px;animation:pop .5s .5s var(--ease) both">
+        <div class="row" style="gap:12px;align-items:flex-start">
+          <div style="width:40px;height:40px;border-radius:11px;flex:none;background:linear-gradient(180deg,#5BE37A,#28B84A);display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 22 22" fill="#fff"><path d="M11 2.5c5 0 9 3.3 9 7.5s-4 7.5-9 7.5c-1 0-2-.1-2.9-.4L3.6 19.4l1.1-3.6C3 14.4 2 12.3 2 10c0-4.2 4-7.5 9-7.5z"/></svg></div>
+          <div style="flex:1"><div class="row between"><span style="font-size:15px;font-weight:650">Mama</span><span style="font-size:13px;opacity:.6">acum 4 min</span></div><div style="font-size:15px;line-height:1.32;opacity:.88;margin-top:2px">Nu sta iar până la 2. Te rog.</div></div></div></div>
+    </div>
+    <div style="font-size:13px;opacity:.7;margin:18px 0 6px">Atinge notificarea de la Caiet</div>
+    <div class="foot" style="flex-direction:row;justify-content:space-between;padding:6px 44px calc(var(--bot) + 6px)">
+      <span class="glass dk circle" style="width:52px;height:52px"><svg width="20" height="22" viewBox="0 0 20 22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><path d="M5 1.5h10v4L13 9v11.5H7V9L5 5.5z"/><path d="M10 12.5v3"/></svg></span>
+      <button class="glass dk circle tap" data-act="closeLock" style="width:52px;height:52px;color:#fff" aria-label="Închide">${I.x}</button>
+    </div>
+  </div>`;
+};
+
+/* ================= navigation ================= */
+const pagesEl = $("#pages"), appEl = $("#app");
+let cur = null, curId = null, stack = [], busy = false;
+const DARK = new Set(["scan","lock"]);
+function go(id, mode = "push", arg) {
+  if (busy) return;
+  if (id === "diag" && (!S.diag || S.diag.done)) S.diag = { i:0, res:[], done:false };
+  const el = document.createElement("section");
+  el.className = "page"; el.dataset.id = id;
+  if (id === "scan" || id === "lock") el.style.background = "#000";
+  el.innerHTML = P[id](arg);
+  pagesEl.appendChild(el);
+  appEl.classList.toggle("dark", DARK.has(id));
+  const old = cur;
+  if (mode === "push" && curId) stack.push(curId);
+  if (mode === "up" && curId) stack.push(curId);
+  const pairs = { push:["anim-in-r","anim-out-l"], pop:["anim-in-l","anim-out-r"], up:["anim-in-up",""], down:["","anim-out-down"], fade:["anim-fade-in","anim-fade-out"], none:["",""] }[mode] || ["",""];
+  if (old) {
+    busy = true;
+    if (mode === "pop" || mode === "down") { pagesEl.appendChild(old); old.classList.add(mode === "pop" ? "out-r" : "out-down"); }
+    if (pairs[0]) el.classList.add(pairs[0]);
+    if (pairs[1]) old.classList.add(pairs[1]);
+    setTimeout(() => { old.remove(); el.classList.remove(...pairs.filter(Boolean)); busy = false; }, pairs[0] || pairs[1] ? 470 : 0);
+  }
+  cur = el; curId = id;
+  mount(id, el, arg);
+  save();
+}
+function back() {
+  if (curId === "scan") stopCam();
+  const prev = stack.pop();
+  if (!prev) return;
+  const mode = (curId === "scan" || curId === "lock") ? "down" : "pop";
+  go(prev, mode);
+}
+function rerender() {
+  if (!cur) return;
+  const sc = cur.querySelector(".scroll"); const top = sc ? sc.scrollTop : 0;
+  cur.innerHTML = P[curId]();
+  const sc2 = cur.querySelector(".scroll"); if (sc2) sc2.scrollTop = top;
+  mount(curId, cur, null, true);
+  save();
+}
+function mount(id, el, arg, re) {
+  requestAnimationFrame(() => setTimeout(() => {
+    el.querySelectorAll("[data-w]").forEach(b => b.style.width = b.dataset.w + "%");
+    el.querySelectorAll("[data-h]").forEach(b => b.style.height = b.dataset.h + "px");
+  }, re ? 0 : 120));
+  if (id === "code") { if (!re) { code = ""; startResend(); } drawCode(); }
+  if (id === "chat" && !re) startChat(arg || "hint");
+}
+
+/* ================= toast & sheet ================= */
+let toastT;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2300);
+}
+function sheet(html) {
+  closeSheet(true);
+  const back = document.createElement("div"); back.className = "sheet-back"; back.dataset.act = "closeSheet";
+  const sh = document.createElement("div"); sh.className = "sheet glass frost"; sh.setAttribute("role", "dialog");
+  sh.innerHTML = `<div class="grab"></div>${html}`;
+  appEl.appendChild(back); appEl.appendChild(sh);
+  const inp = sh.querySelector("input"); if (inp) setTimeout(() => inp.focus(), 380);
+}
+function closeSheet(now) {
+  const b = appEl.querySelector(".sheet-back"), s = appEl.querySelector(".sheet");
+  if (!b && !s) return;
+  if (now) { b && b.remove(); s && s.remove(); return; }
+  if (curId === "scan") setTimeout(() => { if (curId === "scan" && !appEl.querySelector(".sheet")) rerender(); }, 340);
+  b && b.classList.add("closing"); s && s.parentElement && s.classList.add("closing");
+  if (s) s.style.animation = "outDown .32s var(--ease) both";
+  setTimeout(() => { b && b.remove(); s && s.remove(); }, 320);
+}
+
+/* ================= code screen ================= */
+let code = "", resendT, resendLeft = 38;
+function drawCode() {
+  const box = $("#codeBoxes"); if (!box) return;
+  const done = code.length === 6;
+  box.innerHTML = [0,1,2,3,4,5].map(i => {
+    const d = code[i] || "", active = i === code.length && !done;
+    const st = done ? "box-shadow:inset 0 0 0 2px #2FBF94;color:#1d8a68" : active ? "box-shadow:inset 0 0 0 2px #2447D6,0 0 0 4px rgba(36,71,214,.15)" : "";
+    return `<div class="glass frost" style="flex:1;max-width:52px;height:58px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;${st}">${d || (active ? '<div style="width:2px;height:26px;background:#2447D6;border-radius:1px;animation:dot 1s infinite"></div>' : "")}</div>`;
+  }).join("");
+}
+function startResend() {
+  clearInterval(resendT); resendLeft = 38;
+  const draw = () => { const r = $("#resend"); if (!r) { clearInterval(resendT); return; }
+    r.innerHTML = resendLeft > 0 ? `Nu a venit? <span style="color:var(--pix);font-weight:650">Retrimite în 0:${String(resendLeft).padStart(2,"0")}</span>`
+      : `Nu a venit? <button class="tap" data-act="resend" style="color:var(--pix);font-weight:650">Retrimite codul</button>`; };
+  draw(); resendT = setInterval(() => { resendLeft--; draw(); if (resendLeft <= 0) clearInterval(resendT); }, 1000);
+}
+async function typeKey(k) {
+  if (code.length === 6) return;
+  if (k === "del") code = code.slice(0, -1); else code += k;
+  buzz(); drawCode();
+  if (code.length === 6) { await sleep(450); toast("Cont confirmat"); await sleep(500); go("klass"); }
+}
+
+/* ================= chat engine ================= */
+let C = null;
+const msgsEl = () => $("#msgs");
+function scrollChat() { const s = $("#chatScroll"); if (s) s.scrollTo({ top: s.scrollHeight, behavior: "smooth" }); }
+function addMsg(who, html) {
+  const m = msgsEl(); if (!m) return;
+  const b = document.createElement("div");
+  b.className = who === "me" ? "bub me" : "bub ai glass frost";
+  b.innerHTML = html; m.appendChild(b); scrollChat();
+}
+async function ai(html, delay = 650) {
+  const m = msgsEl(); if (!m) return;
+  const t = document.createElement("div"); t.className = "bub ai glass frost typing"; t.innerHTML = "<i></i><i></i><i></i>";
+  m.appendChild(t); scrollChat();
+  await sleep(delay);
+  if (!t.isConnected) return;
+  t.remove(); addMsg("ai", html);
+}
+function setStep(n) {
+  C.step = n;
+  const l = $("#stepLbl"); if (l) l.textContent = n > 4 ? "Rezolvat" : `Pasul ${n} din 4`;
+  const d = $("#stepDots"); if (d) d.innerHTML = [1,2,3,4].map(k => `<span style="width:14px;height:5px;border-radius:3px;display:block;background:${k <= Math.min(n, 4) ? "#2447D6" : "rgba(20,22,31,.15)"}"></span>`).join("");
+}
+function chips(list) {
+  const q = $("#qchips"); if (!q) return;
+  q.innerHTML = list.map(([t, a]) => `<button class="glass qchip frost tap" data-act="chip" data-arg="${esc(a)}">${t}</button>`).join("");
+}
+function placeholder(p) { const i = $("#chatIn"); if (i) i.placeholder = p; }
+const OK = (t) => `<div class="ok-line">${I.check("#2FBF94", 16)}${t}</div>`;
+async function startChat(mode) {
+  C = { step:1, mode, mistakes:0, wait:"abc", busy:false };
+  setStep(1); chips([]);
+  if (mode === "method") {
+    await ai(`Metoda pe scurt, pentru ax² + bx + c = 0:<br>1. Afli a, b și c.<br>2. Calculezi Δ = b² − 4ac.<br>3. Dacă Δ ≥ 0, aplici formula:<div class="formula">x<sub style="font-size:10px">1,2</sub> = (−b ± √Δ) / 2a</div>`, 700);
+    await ai("Vrei să-l rezolvi tu acum, cu indicii? Eu doar întreb.", 500);
+    chips([["Da, hai","start"],["Mai târziu","later"]]); C.wait = "method"; placeholder("Scrie „da” ca să începem…");
+    return;
+  }
+  await ai("Hai să-l rezolvăm împreună. Eu întreb, tu răspunzi.", 500);
+  askABC();
+}
+async function askABC() {
+  C.wait = "abc"; setStep(1);
+  await ai("Pasul 1: cine sunt a, b și c?", 550);
+  chips([["a = 1, b = −5, c = 6","abc_ok"],["a = 1, b = 5, c = 6","abc_bad"],["Nu știu","abc_idk"],["Dă-mi un indiciu","hint"]]);
+  placeholder("ex. a = 1, b = …");
+}
+async function askDelta() {
+  C.wait = "deltaF"; setStep(2);
+  await ai("Acum calculează Δ. Știi formula?", 600);
+  chips([["Δ = b² − 4ac","df_ok"],["Nu, dă-mi un indiciu","df_hint"],["Nu înțeleg ce e Δ","whatDelta"]]);
+  placeholder("Scrie formula sau cere un indiciu…");
+}
+async function askDeltaVal() {
+  C.wait = "deltaV"; setStep(2);
+  chips([["Dă-mi un indiciu","hint"],["Nu înțeleg ce e Δ","whatDelta"]]); placeholder("Δ = …");
+}
+async function askRoots() {
+  C.wait = "roots"; setStep(3);
+  await ai(`Δ = 1 > 0, deci ai două soluții. Le găsești tu cu formula de mai jos?<div class="formula">x<sub style="font-size:10px">1,2</sub> = (−b ± √Δ) / 2a</div>`, 700);
+  chips([["Dă-mi un indiciu","hint"]]); placeholder("x₁ = …, x₂ = …");
+}
+async function finishChat() {
+  C.wait = "done"; setStep(5); chips([]);
+  await ai(`${OK("Rezolvat")}<div style="margin-top:4px">x₁ = 2 și x₂ = 3. Verificare: 2² − 5·2 + 6 = 0 și 3² − 5·3 + 6 = 0.</div>`, 700);
+  if (C.mistakes) { S.cardsDue += 1; await ai("Am făcut un cartonaș din pasul la care te-ai încurcat. Îl repeți mâine.", 600); }
+  else await ai("Fără nicio greșeală. Pe ăsta nu ți-l mai explic, doar te mai verific peste câteva zile.", 600);
+  S.lessonDone = Math.min(3, S.lessonDone + 1); save();
+  chips([["Înapoi la Azi","home"],["Vezi cartonașele","cards"]]); placeholder("Scrie ceva…");
+}
+const nums = (s) => (s.replace(/[−–]/g, "-").replace(/[₁₂]/g, "").match(/-?\d+(\.\d+)?/g) || []).map(Number);
+async function handle(input, fromChip) {
+  if (!C || C.busy) return;
+  const txt = input.trim(); if (!txt) return;
+  C.busy = true;
+  try {
+    const low = txt.toLowerCase();
+    const label = fromChip ? fromChip : txt;
+    addMsg("me", esc(label));
+    if (input === "hint") return await hint();
+    if (input === "whatDelta" || /ce e (Δ|delta)|nu înțeleg ce|nu inteleg ce/.test(low)) {
+      await ai("Δ (delta) e un număr care îți spune câte soluții are ecuația: dacă e pozitiv, două; dacă e 0, una; dacă e negativ, niciuna. Se calculează cu Δ = b² − 4ac.", 800);
+      if (C.wait === "deltaF") { C.wait = "deltaV"; await ai("Acum pune numerele: a = 1, b = −5, c = 6. Cât îți iese?", 500); return askDeltaVal(); }
+      return;
+    }
+    if (input === "home") { go("home", "fade"); stack = []; return; }
+    if (input === "cards") { go("cards"); return; }
+    if (C.wait === "method") {
+      if (input === "start" || /^da|hai|ok/.test(low)) { C.mode = "hint"; await ai("Super. Hai pas cu pas.", 400); return askABC(); }
+      if (input === "later") { await ai("Bine. Îl găsești în „Azi” când vrei să revii.", 500); chips([["Înapoi la Azi","home"]]); return; }
+      return;
+    }
+    if (C.wait === "abc") {
+      const n = nums(txt);
+      const ok = input === "abc_ok" || (n.length >= 3 && n[0] === 1 && n[1] === -5 && n[2] === 6);
+      if (ok) { await ai(OK("Bun: a = 1, b = −5, c = 6."), 500); return askDelta(); }
+      if (input === "abc_idk" || /nu știu|nu stiu/.test(low)) { await ai("a e numărul din fața lui x², b cel din fața lui x, iar c e termenul liber. Aici: a = 1, b = −5, c = 6.", 800); C.mistakes++; return askDelta(); }
+      C.mistakes++;
+      await ai("Aproape. Uită-te la semnul din fața lui 5x: e minus, deci b = −5. Restul e bine.", 700);
+      return askDelta();
+    }
+    if (C.wait === "deltaF") {
+      if (input === "df_ok" || /b\s*(²|\^?2)\s*[-−]\s*4\s*a\s*c/.test(low)) { await ai("Da. Pune numerele și spune-mi ce îți iese.", 500); return askDeltaVal(); }
+      if (input === "df_hint") { await ai("Formula e Δ = b² − 4ac. Pune numerele și spune-mi ce îți iese.", 600); C.mistakes++; return askDeltaVal(); }
+      const n = nums(txt); if (n.length) { C.wait = "deltaV"; return await checkDelta(n); }
+      await ai("Formula e Δ = b² − 4ac. Încearcă acum cu numerele noastre.", 600); return askDeltaVal();
+    }
+    if (C.wait === "deltaV") { const n = nums(txt); if (!n.length) { await ai("Scrie doar numărul pe care îl obții pentru Δ.", 500); return; } return await checkDelta(n); }
+    if (C.wait === "roots") {
+      const n = nums(txt).filter(v => !Number.isNaN(v));
+      const set = new Set(n);
+      if (set.has(2) && set.has(3)) return finishChat();
+      if (set.has(2) || set.has(3)) { C.mistakes++; await ai(`${set.has(2) ? "x = 2" : "x = 3"} e bună. Și cealaltă? Folosește acum semnul ${set.has(2) ? "plus" : "minus"}.`, 600); return; }
+      C.mistakes++; await ai("Nu chiar. −b = 5 și √Δ = 1. Deci (5 + 1) / 2 și (5 − 1) / 2. Cât fac?", 700); return;
+    }
+    if (C.wait === "done") { await ai("Dacă vrei încă un exercițiu, apasă pe butonul cu camera din „Azi”.", 500); chips([["Înapoi la Azi","home"],["Vezi cartonașele","cards"]]); return; }
+  } finally { C && (C.busy = false); }
+}
+async function checkDelta(n) {
+  let v = n[n.length - 1];
+  if (n.length === 2 && n[0] === 25 && n[1] === -24) { await ai("Exact asta e scăderea. Și cât face?", 500); return; }
+  if (v === 1) { await ai(OK("Corect."), 450); return askRoots(); }
+  C.mistakes++;
+  if (v === 49) await ai("Atenție la semn: −4 · 1 · 6 = −24. Deci 25 − 24. Cât face?", 700);
+  else await ai("Ia-o pe bucăți: b² = (−5)² = 25 și 4ac = 4 · 1 · 6 = 24. Cât face 25 − 24?", 700);
+}
+async function hint() {
+  C.mistakes++;
+  const h = { abc:"Ecuația are forma ax² + bx + c = 0. Uită-te ce număr stă în fața lui x², ce număr în fața lui x (cu tot cu semn) și ce rămâne singur.",
+    deltaF:"Δ = b² − 4ac. Îl folosești ca să afli câte soluții are ecuația.",
+    deltaV:"b² = (−5)² = 25. Apoi 4 · a · c = 4 · 1 · 6 = 24. Scade-le.",
+    roots:"Pune numerele în formulă: x = (5 ± 1) / 2. O dată cu plus, o dată cu minus.",
+    method:"Scrie „da” și te iau pas cu pas.", done:"Ai terminat exercițiul." }[C.wait] || "Încearcă pas cu pas.";
+  await ai(h, 600);
+}
+
+/* ================= camera (optional) ================= */
+let stream = null;
+async function realCam() {
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("no");
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }, audio:false });
+    const v = $("#camVideo"); if (!v) { stopCam(); return; }
+    v.srcObject = stream; v.style.display = "block"; $("#paper").style.display = "none";
+    toast("Camera e pornită. În demo, recunoaște exercițiul din exemplu.");
+  } catch (e) { toast("Camera nu e disponibilă aici. Folosim foaia din exemplu."); }
+}
+function stopCam() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
+async function shoot() {
+  if (busy) return;
+  const f = $("#flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); buzz();
+  const box = $("#scanbox"); const foot = $("#scanFoot"); const hintEl = $("#scanHint");
+  foot.style.opacity = ".0"; foot.style.pointerEvents = "none"; foot.style.transition = "opacity .25s";
+  box.parentElement.classList.add("scanning");
+  if (hintEl) hintEl.textContent = "Citesc exercițiul…";
+  await sleep(1300);
+  if (!box.isConnected) return;
+  box.parentElement.classList.remove("scanning"); box.classList.add("found");
+  box.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 318 98" preserveAspectRatio="none" style="position:absolute;inset:0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"><path d="M2 26V16A14 14 0 0 1 16 2h12"/><path d="M290 2h12a14 14 0 0 1 14 14v10"/><path d="M316 72v10a14 14 0 0 1-14 14h-12"/><path d="M28 96H16A14 14 0 0 1 2 82V72"/></svg>
+    <div class="glass frost pill" style="position:absolute;left:14px;top:-42px;font-size:13px;color:#14161F;letter-spacing:0;padding:7px 12px;animation:pop .4s var(--ease) both">${I.check("#2FBF94", 14)}Ecuație de gradul al II-lea</div>`;
+  await sleep(350);
+  sheet(`<div style="font-size:21px;font-weight:700;letter-spacing:-.4px">Am găsit exercițiul a)</div>
+    <div style="font-size:15px;margin-top:4px;color:#555c70">x² − 5x + 6 = 0 · Cum vrei să-l lucrăm?</div>
+    <div class="stack" style="gap:10px;margin-top:16px">
+      <button class="cta ink tap" data-act="toChat" data-arg="hint">Îl rezolv eu, cu indicii</button>
+      <button class="glass gbtn tap" data-act="toChat" data-arg="method">Arată-mi doar metoda</button>
+    </div>`);
+}
+
+/* ================= actions ================= */
+const A = {
+  go:(id, el) => { closeSheet(true); go(id, el.dataset.mode || "push"); },
+  back:() => { closeSheet(true); back(); },
+  tab:(id) => { if (id === curId) return; go(id, "fade"); stack = []; },
+  haveAccount:() => { Object.assign(S, { onboarded:true, grade:S.grade || "a IX-a", profile:S.profile || "Matematică-informatică" }); stack = []; go("home", "fade"); toast(`Bine ai revenit, ${S.name}!`); },
+  sso:async (who, el) => {
+    el.innerHTML = '<span class="spin" style="border-color:rgba(20,22,31,.2);border-top-color:#2447D6"></span>';
+    if (who === "Apple") el.querySelector(".spin").style.cssText = "";
+    await sleep(800); toast(`Conectat cu ${who}`); go("klass");
+  },
+  emailSheet:() => sheet(`<div style="font-size:21px;font-weight:700">Emailul tău</div>
+    <div style="font-size:14.5px;color:#555c70;margin-top:4px">Îți trimitem un cod de 6 cifre. Fără parolă.</div>
+    <form data-form="email" style="margin-top:14px" novalidate>
+      <div class="glass frost field" style="height:54px"><input id="emailIn" type="email" inputmode="email" autocomplete="email" placeholder="nume@email.ro" value="${esc(S.email)}" aria-describedby="emailErr"></div>
+      <div id="emailErr" style="font-size:13px;color:var(--coral-d);min-height:18px;margin:6px 4px 0"></div>
+      <button class="cta tap" type="submit" style="margin-top:6px">Trimite codul</button>
+    </form>`),
+  key:(k) => typeKey(k),
+  resend:() => { toast("Ți-am trimis un cod nou"); startResend(); },
+  grade:(g) => { S.grade = g; buzz(); rerender(); },
+  profile:(p) => { S.profile = p; buzz(); rerender(); },
+  toggleSubj:(k) => { S.subjects[k] = !S.subjects[k]; buzz(); rerender(); },
+  answer:async (k, el) => {
+    if (busy) return;
+    const d = S.diag, q = DIAG[d.i]; k = Number(k);
+    busy = true; buzz();
+    el.classList.add("pick");
+    cur.querySelectorAll('[data-act="answer"]').forEach(b => b.disabled = true);
+    d.res[d.i] = k === -1 ? "idk" : k === q.a ? "ok" : "bad";
+    await sleep(420); busy = false;
+    const stop = d.i >= 1 && d.res[0] !== "ok" && d.res[1] !== "ok";
+    if (d.i >= DIAG.length - 1 || stop) { d.done = true; save(); toast(stop ? "Gata, am aflat destul" : "Test terminat"); go("map"); }
+    else { d.i++; save(); const sc = cur.querySelector("#qcard"); sc && (sc.style.animation = "fadeOut .15s both"); await sleep(140); rerender(); const q2 = cur.querySelector("#qcard"); q2 && (q2.style.animation = "pop .35s var(--ease) both"); }
+  },
+  skipDiag:() => { S.diag = { i:0, res:[], done:true, skipped:true }; go("map"); },
+  addTeza:() => sheet(`<div style="font-size:21px;font-weight:700">Adaugă o teză</div>
+    <div class="lbl" style="margin:14px 2px 8px">Materia</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap" id="tzS">${SUBJ.filter(s => S.subjects[s.k] && s.k !== "mate" && s.k !== "romana").concat(SUBJ.filter(s => s.k === "chimie")).filter((v, i, a) => a.indexOf(v) === i).map((s, i) => `<button class="glass pill frost tap tzs ${i === 0 ? "sel" : ""}" data-act="tzPick" data-arg="${s.n}" style="font-size:14px;padding:10px 14px;letter-spacing:0;color:#14161F">${s.n}</button>`).join("")}</div>
+    <div class="lbl" style="margin:16px 2px 8px">Când</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap" id="tzD">${[[4,"peste 4 zile"],[7,"peste o săptămână"],[14,"peste 2 săptămâni"]].map(([d, t], i) => `<button class="glass pill frost tap tzd ${i === 1 ? "sel" : ""}" data-act="tzDay" data-arg="${d}" style="font-size:14px;padding:10px 14px;letter-spacing:0;color:#14161F">${t}</button>`).join("")}</div>
+    <button class="cta tap" data-act="tzSave" style="margin-top:18px">Adaugă</button>`) || styleSel(),
+  tzPick:(v, el) => { el.parentElement.querySelectorAll(".tzs").forEach(b => b.classList.remove("sel")); el.classList.add("sel"); styleSel(); },
+  tzDay:(v, el) => { el.parentElement.querySelectorAll(".tzd").forEach(b => b.classList.remove("sel")); el.classList.add("sel"); styleSel(); },
+  tzSave:() => {
+    const s = appEl.querySelector(".tzs.sel"), d = appEl.querySelector(".tzd.sel");
+    if (s && d) { S.extraTeze.push({ n:s.dataset.arg, days:Number(d.dataset.arg) }); toast(`Am adăugat teza la ${s.dataset.arg.toLowerCase()}`); }
+    closeSheet(); rerender();
+  },
+  minutes:(v) => { S.minutes = Number(v); buzz(); rerender(); },
+  remindTime:() => { const o = ["18:00","19:30","21:00"]; S.remind = o[(o.indexOf(S.remind) + 1) % o.length]; buzz(); rerender(); },
+  remindToggle:() => { S.remindOn = !S.remindOn; buzz(); rerender(); toast(S.remindOn ? `Îți amintesc la ${S.remind}` : "Notificarea e oprită"); },
+  parentToggle:() => { S.parent = !S.parent; buzz(); rerender(); toast(S.parent ? "Un părinte primește rezumatul duminica" : "Rezumatul pentru părinte e oprit"); },
+  finish:() => { S.onboarded = true; save(); stack = []; go("home", "fade"); setTimeout(() => toast(`Gata, ${S.name}! Ăsta e ecranul tău.`), 350); },
+  continue:(k) => { if (k === "mate") go("chat", "push", "hint"); else toast("În demo, lecția interactivă e la matematică"); },
+  subject:(k) => { S.active = k; buzz(); rerender(); },
+  streak:() => toast(`${S.streak} zile la rând. Mâine faci ${S.streak + 1}!`),
+  ieri:() => sheet(`<div class="lbl" style="color:var(--pix)">2 minute · recapitulare</div>
+    <div style="font-size:22px;font-weight:700;letter-spacing:-.4px;margin-top:6px">Δ negativ, pe scurt</div>
+    <svg width="100%" height="90" viewBox="0 0 326 90" style="margin-top:10px" aria-hidden="true"><line x1="8" y1="76" x2="318" y2="76" stroke="#14161F" stroke-opacity=".35" stroke-width="1.5"/><path d="M93 4 Q163 92 233 4" fill="none" stroke="#2447D6" stroke-width="3" stroke-linecap="round"/><text x="300" y="70" font-size="12" fill="#4a5068">Ox</text></svg>
+    <p style="font-size:15.5px;line-height:1.45;margin:8px 0 0">Când Δ &lt; 0, parabola nu atinge axa Ox. Asta înseamnă că ecuația <b>nu are soluții reale</b>. De exemplu, la x² + 4 = 0: Δ = 0 − 16 = −16.</p>
+    <button class="cta tap" data-act="go" data-arg="cards" style="margin-top:16px">Verifică-te cu un cartonaș</button>`),
+  toChat:(m) => { closeSheet(true); stopCam(); go("chat", "push", m); if (stack[stack.length - 1] === "scan") stack.pop(); },
+  shoot:() => shoot(),
+  realCam:() => realCam(),
+  flashToggle:(v, el) => { el.dataset.on = el.dataset.on ? "" : "1"; el.innerHTML = I.bolt(el.dataset.on ? "#fff" : "#FFD66E"); toast(el.dataset.on ? "Bliț pornit" : "Bliț automat"); },
+  chip:(a, el) => handle(a, el.textContent),
+  chatHelp:() => sheet(`<div style="font-size:21px;font-weight:700">Cum lucrăm aici</div>
+    <p style="font-size:15.5px;line-height:1.45;margin:8px 0 0">Caiet nu îți dă rezultatul. Îți pune întrebări mici, pas cu pas, până ajungi singur la el. Poți scrie răspunsul sau apăsa pe butoanele de deasupra.</p>
+    <p style="font-size:15.5px;line-height:1.45;margin:8px 0 0">Unde te încurci, se face un cartonaș pe care îl repeți a doua zi.</p>
+    <button class="cta tap" data-act="closeSheet" style="margin-top:16px">Am înțeles</button>`),
+  mic:() => toast("Dictarea vine în versiunea completă"),
+  pickCard:(k) => { if (deck.picked !== null) return; deck.picked = Number(k); buzz(); rerender(); },
+  cardNext:(how) => { if (deck.picked === null) return; if (how === "known") { deck.known++; S.cardsKnown++; } else deck.again++; S.cardsDue = Math.max(0, S.cardsDue - 1); deck.i++; deck.picked = null; rerender(); },
+  cardsDone:() => { deck = { i:0, picked:null, known:0, again:0 }; stack = []; go("home", "pop"); },
+  cardsAgain:() => { deck = { i:0, picked:null, known:0, again:0 }; rerender(); },
+  lockDemo:() => go("lock", "up"),
+  closeLock:() => back(),
+  openNotif:() => { deck = { i:0, picked:null, known:0, again:0 }; stack = ["home"]; go("cards", "fade"); },
+  redoDiag:() => { S.diag = null; go("diag"); },
+  askReset:() => sheet(`<div style="font-size:21px;font-weight:700">Reiei de la început?</div>
+    <p style="font-size:15.5px;line-height:1.45;margin:8px 0 0">Se șterg alegerile din acest demo și pornești din nou de la ecranul de bun venit.</p>
+    <div class="row" style="gap:10px;margin-top:16px"><button class="glass frost gbtn tap" data-act="closeSheet" style="flex:1">Nu</button><button class="cta tap" data-act="reset" style="flex:1;background:var(--coral-d)">Da, reia</button></div>`),
+  reset:() => { closeSheet(true); stopCam(); S = DEFAULT(); deck = { i:0, picked:null, known:0, again:0 }; save(); stack = []; busy = false; go("welcome", "fade"); },
+  jumpHome:() => { closeSheet(true); stopCam(); if (!S.grade) { S.grade = "a IX-a"; S.profile = "Matematică-informatică"; } S.onboarded = true; stack = []; busy = false; go("home", "fade"); },
+  closeSheet:() => closeSheet(),
+};
+function styleSel() {
+  setTimeout(() => appEl.querySelectorAll(".tzs,.tzd").forEach(b => {
+    const on = b.classList.contains("sel");
+    b.style.background = on ? "rgba(36,71,214,.88)" : ""; b.style.color = on ? "#fff" : "#14161F";
+  }), 0);
+}
+
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-act]");
+  if (!el || el.disabled) return;
+  const fn = A[el.dataset.act];
+  if (fn) { e.preventDefault(); fn(el.dataset.arg, el, e); }
+});
+document.addEventListener("submit", async (e) => {
+  const f = e.target.closest("[data-form]"); if (!f) return;
+  e.preventDefault();
+  if (f.dataset.form === "chat") { const i = $("#chatIn"); const v = i.value; i.value = ""; handle(v); }
+  if (f.dataset.form === "classCode") {
+    const v = $("#classCode").value.trim().toUpperCase();
+    if (v.length < 3) { toast("Scrie codul primit de la profesor"); return; }
+    S.classCode = v; save(); toast(`Te-am pus în clasa ${v}`); await sleep(600); A.emailSheet();
+  }
+  if (f.dataset.form === "email") {
+    const v = $("#emailIn").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { $("#emailErr").textContent = "Scrie un email valid, de exemplu ioana@gmail.com."; return; }
+    S.email = v; save(); closeSheet(true); go("code");
+  }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "school") { S.school = e.target.value; save(); }
+  if (e.target.id === "nameIn") { S.name = e.target.value.trim() || "Ioana"; save(); }
+});
+document.addEventListener("keydown", (e) => {
+  if (curId === "code" && !e.target.closest("input")) {
+    if (/^\d$/.test(e.key)) typeKey(e.key); else if (e.key === "Backspace") typeKey("del");
+  }
+  if (e.key === "Escape") { if (appEl.querySelector(".sheet")) closeSheet(); }
+});
+
+/* ================= fit the drawn phone ================= */
+const IS_PHONE = (() => {
+  const ua = navigator.userAgent || "";
+  const uaPhone = /iPhone|iPod|Android.*Mobile|Mobile.*Firefox|Windows Phone/i.test(ua);
+  const small = Math.min(screen.width || 9999, screen.height || 9999) <= 600;
+  const touch = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
+  return uaPhone || (touch && small);
+})();
+function fit() {
+  const framed = !IS_PHONE && window.innerWidth >= 640 && window.innerHeight >= 600;
+  document.body.classList.toggle("framed", framed);
+  document.body.classList.toggle("phone-ui", !framed);
+  const side = $("#side"); side.classList.toggle("show", framed && window.innerWidth >= 1000);
+  if (framed) {
+    const sc = Math.min(1, (window.innerHeight - 40) / 866, (window.innerWidth - (window.innerWidth >= 1000 ? 460 : 40)) / 412);
+    const dev = $("#device"); dev.style.setProperty("--scale", sc.toFixed(3));
+    dev.style.margin = `${-(866 * (1 - sc)) / 2}px ${-(412 * (1 - sc)) / 2}px`;
+  } else { $("#device").style.margin = "0"; }
+}
+window.addEventListener("resize", fit);
+fit();
+const tick = () => { const d = new Date(); $("#clock").textContent = `${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`; };
+tick(); setInterval(tick, 15000);
+
+go(S.onboarded ? "home" : "welcome", "none");
+})();
+</script>
+</body>
+</html>
